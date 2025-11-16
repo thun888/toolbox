@@ -1,0 +1,37 @@
+[
+    {
+        "category": "开发工具",
+        "tools": [
+            {
+                "title": "字符去重",
+                "description": "保持字符出现的顺序，只保留每个字符的第一次出现（支持中文、Emoji 等）。",
+                "url": "html/字符去重/index.html"
+            },
+            {
+                "title": "移除文本缩进",
+                "description": "移除文本每行前的缩进（空格或制表符），可指定移除数量。",
+                "url": "html/移除文本缩进/index.html"
+            }
+        ]
+    },
+    {
+        "category": "学习工具",
+        "tools": [
+            {
+                "title": "矩阵乘法动态演示",
+                "description": "矩阵乘法动态演示",
+                "url": "html/矩阵乘法动态演示/index.html"
+            }
+        ]
+    },
+    {
+        "category": "生活工具",
+        "tools": [
+            {
+                "title": "抽签分组并分配任务",
+                "description": "抽签分组并分配任务",
+                "url": "html/抽签分组并分配任务/index.html"
+            }
+        ]
+    }
+]

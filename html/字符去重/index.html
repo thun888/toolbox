@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>字符去重（按首次出现）</title>
+    <!-- 引入 mdui 3 CSS 和 JS -->
+    <link rel="stylesheet" href="https://static.hzchu.top/mdui@2/mdui.css">
+    <script src="https://static.hzchu.top/mdui@2/mdui.global.js"></script>
+
+    <!-- Filled -->
+    <link
+    href="https://cfproxy.hzchu.top/https://fonts.googleapis.com/icon?family=Material+Icons"
+    rel="stylesheet"
+    />
+    <!-- favicon -->
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--mdui-color-surface-container);
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 24px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 32px;
+        }
+
+        .header h1 {
+            font-size: 2rem;
+            font-weight: 500;
+            color: var(--mdui-color-on-surface);
+            margin: 0 0 8px 0;
+        }
+
+        .header p {
+            font-size: 1rem;
+            color: var(--mdui-color-on-surface-variant);
+            margin: 0;
+        }
+
+        .main-card {
+            margin-bottom: 24px;
+        }
+
+        .card-content {
+            padding: 24px;
+        }
+
+        .section-title {
+            font-size: 1.125rem;
+            font-weight: 500;
+            color: var(--mdui-color-on-surface);
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .input-area {
+            margin-bottom: 20px;
+        }
+
+        .controls {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 16px;
+        }
+
+        .hint-card {
+            margin: 20px 0;
+        }
+
+        .hint-content {
+            padding: 16px;
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+        }
+
+        .hint-text {
+            color: var(--mdui-color-on-surface-variant);
+            font-size: 0.875rem;
+            line-height: 1.6;
+        }
+
+        .result-area {
+            position: relative;
+        }
+
+        .result-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .result-display {
+            background-color: var(--mdui-color-surface-variant);
+            padding: 16px;
+            border-radius: 8px;
+            min-height: 120px;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 1rem;
+            line-height: 1.6;
+            word-break: break-word;
+            white-space: pre-wrap;
+            color: var(--mdui-color-on-surface-variant);
+        }
+
+        .empty-state {
+            color: var(--mdui-color-outline);
+            font-style: italic;
+        }
+
+        .stats {
+            display: flex;
+            gap: 24px;
+            margin-top: 12px;
+            padding: 12px;
+            background-color: var(--mdui-color-surface-container-high);
+            border-radius: 8px;
+        }
+
+        .stat-item {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .stat-label {
+            font-size: 0.75rem;
+            color: var(--mdui-color-on-surface-variant);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .stat-value {
+            font-size: 1.25rem;
+            font-weight: 500;
+            color: var(--mdui-color-on-surface);
+        }
+
+        /* 自定义文本框样式 */
+        mdui-text-field::part(input) {
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            line-height: 1.6;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>字符去重工具</h1>
+            <p>按首次出现顺序保留字符，支持中文、Emoji 等 Unicode 字符</p>
+        </div>
+
+        <!-- 主卡片 -->
+        <mdui-card variant="elevated" class="main-card">
+            <div class="card-content">
+                <!-- 输入区域 -->
+                <div class="input-area">
+                    <div class="section-title">
+                        <mdui-icon name="input"></mdui-icon>
+                        输入文本
+                    </div>
+                    <mdui-text-field
+                        id="input"
+                        label="请输入字符串"
+                        placeholder="在这里粘贴或输入文本（支持中文、Emoji 等）"
+                        rows="6"
+                        autosize
+                        style="width: 100%;">
+                    </mdui-text-field>
+                </div>
+
+                <!-- 操作按钮 -->
+                <div class="controls">
+                    <!-- <mdui-button variant="filled" icon="filter_list" id="dedupeBtn">
+                        去重并显示
+                    </mdui-button> -->
+                    <mdui-button variant="tonal" icon="delete" id="clearBtn">
+                        清空
+                    </mdui-button>
+                </div>
+
+                <!-- 提示信息 -->
+                <mdui-card variant="outlined" class="hint-card">
+                    <div class="hint-content">
+                        <mdui-icon name="info" style="color: var(--mdui-color-primary);"></mdui-icon>
+                        <div class="hint-text">
+                            <strong>去重规则：</strong>保持字符出现的顺序，只保留每个字符的第一次出现。
+                            例如：<code>"abb中中a"</code> → <code>"ab中a"</code>，并且区分大小写。
+                        </div>
+                    </div>
+                </mdui-card>
+
+                <mdui-divider style="margin: 24px 0;"></mdui-divider>
+
+                <!-- 输出区域 -->
+                <div class="result-area">
+                    <div class="result-header">
+                        <div class="section-title" style="margin-bottom: 0;">
+                            <mdui-icon name="output"></mdui-icon>
+                            去重结果
+                        </div>
+                        <mdui-button-icon icon="content_copy" id="copyBtn"></mdui-button-icon>
+                    </div>
+                    
+                    <div class="result-display" id="result">
+                        <span class="empty-state">结果将在这里显示...</span>
+                    </div>
+
+                    <!-- 统计信息 -->
+                    <div class="stats">
+                        <div class="stat-item">
+                            <span class="stat-label">原始字符数</span>
+                            <span class="stat-value" id="originalCount">0</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">去重后字符数</span>
+                            <span class="stat-value" id="dedupedCount">0</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">去重率</span>
+                            <span class="stat-value" id="dedupRate">0%</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </mdui-card>
+    </div>
+
+    <script>
+        const { snackbar } = mdui;
+
+        const input = document.getElementById('input');
+        const resultEl = document.getElementById('result');
+        const dedupeBtn = document.getElementById('dedupeBtn');
+        const copyBtn = document.getElementById('copyBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        const originalCountEl = document.getElementById('originalCount');
+        const dedupedCountEl = document.getElementById('dedupedCount');
+        const dedupRateEl = document.getElementById('dedupRate');
+
+        // 去重函数：按首次出现保留字符（支持 emoji / 码点）
+        function dedupeByFirstOccurrence(str) {
+            const seen = new Set();
+            let out = '';
+            // for...of 遍历的是 unicode 码点（不会把 emoji 拆开）
+            for (const ch of str) {
+                if (!seen.has(ch)) {
+                    seen.add(ch);
+                    out += ch;
+                }
+            }
+            return out;
+        }
+
+        function updateResult() {
+            const text = input.value;
+            const deduped = dedupeByFirstOccurrence(text);
+            
+            // 更新显示
+            if (deduped) {
+                resultEl.innerHTML = deduped;
+                resultEl.style.color = 'var(--mdui-color-on-surface)';
+            } else {
+                resultEl.innerHTML = '<span class="empty-state">（结果为空）</span>';
+            }
+
+            // 更新统计信息
+            const originalLength = Array.from(text).length; // 正确计算 Unicode 字符数
+            const dedupedLength = Array.from(deduped).length;
+            const rate = originalLength > 0 ? 
+                Math.round((1 - dedupedLength / originalLength) * 100) : 0;
+
+            originalCountEl.textContent = originalLength;
+            dedupedCountEl.textContent = dedupedLength;
+            dedupRateEl.textContent = rate + '%';
+        }
+
+        // 实时更新（输入时）
+        input.addEventListener('input', updateResult);
+
+        // 去重按钮
+        dedupeBtn.addEventListener('click', () => {
+            if (!input.value.trim()) {
+                snackbar({ message: '请先输入文本', placement: 'top' });
+                return;
+            }
+            updateResult();
+            snackbar({ message: '去重完成', placement: 'top' });
+        });
+
+        // 复制结果到剪贴板
+        copyBtn.addEventListener('click', async () => {
+            const text = resultEl.textContent || '';
+            if (!text || text === '（结果为空）' || text === '结果将在这里显示...') {
+                snackbar({ message: '没有可以复制的内容', placement: 'top' });
+                return;
+            }
+            
+            try {
+                await navigator.clipboard.writeText(text);
+                snackbar({ message: '已复制到剪贴板', placement: 'top' });
+            } catch (err) {
+                // 回退方案
+                const ta = document.createElement('textarea');
+                ta.value = text;
+                ta.style.position = 'fixed';
+                ta.style.opacity = '0';
+                document.body.appendChild(ta);
+                ta.select();
+                try {
+                    document.execCommand('copy');
+                    snackbar({ message: '已复制到剪贴板', placement: 'top' });
+                } catch (e) {
+                    snackbar({ message: '复制失败，请手动复制', placement: 'top' });
+                } finally {
+                    document.body.removeChild(ta);
+                }
+            }
+        });
+
+        // 清空
+        clearBtn.addEventListener('click', () => {
+            input.value = '';
+            updateResult();
+            input.focus();
+            snackbar({ message: '已清空输入', placement: 'top' });
+        });
+
+        // 初始化
+        updateResult();
+    </script>
+</body>
+</html>

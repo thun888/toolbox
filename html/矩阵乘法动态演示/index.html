@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>矩阵乘法动态演示</title>
+  <style>
+    :root{--accent:#2563eb;--muted:#6b7280;--bg:#0f172a}
+    html,body{height:100%;margin:0;font-family:Inter,ui-sans-serif,system-ui,Segoe UI,Roboto,"Helvetica Neue",Arial}
+    body{background:linear-gradient(180deg,#0b1220 0%, #071025 100%);color:#e6eef8;padding:18px;box-sizing:border-box}
+    .app{max-width:1100px;margin:0 auto}
+    header{display:flex;align-items:center;gap:16px;margin-bottom:14px}
+    h1{font-size:18px;margin:0}
+    .controls{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+    .card{background:rgba(255,255,255,0.03);padding:12px;border-radius:10px;box-shadow:0 6px 18px rgba(2,6,23,0.6)}
+    label{font-size:13px;color:var(--muted);display:block;margin-bottom:6px}
+    input[type=number]{width:72px;padding:6px;border-radius:6px;border:1px solid rgba(255,255,255,0.06);background:transparent;color:inherit}
+    button{background:var(--accent);border:none;color:white;padding:8px 12px;border-radius:8px;cursor:pointer}
+    button.secondary{background:transparent;border:1px solid rgba(255,255,255,0.06)}
+    .layout{display:flex;gap:16px}
+    .matrix-area{display:flex;flex-direction:column;gap:10px;align-items:center}
+    .matrix{display:grid;gap:6px;padding:10px;border-radius:8px;background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));min-width:80px}
+    .matrix .cell{min-width:36px;min-height:36px;display:flex;align-items:center;justify-content:center;border-radius:6px;background:rgba(255,255,255,0.02);font-weight:600}
+    .matrix .cell.dim{background:rgba(255,255,255,0.01);font-weight:400;color:var(--muted);}
+    .matrix-title{font-size:13px;color:var(--muted);margin-bottom:6px}
+    .highlight{box-shadow:0 0 0 3px rgba(37,99,235,0.12) inset;border:2px solid rgba(37,99,235,0.25)}
+    .col-highlight{box-shadow:0 0 0 3px rgba(16,185,129,0.07) inset;border:2px solid rgba(16,185,129,0.16)}
+    .sum-box{min-width:220px;padding:10px;border-radius:8px}
+    .step-row{display:flex;gap:8px;align-items:center}
+    .muted{color:var(--muted)}
+    .small{font-size:13px}
+    footer{margin-top:12px;color:var(--muted);font-size:13px}
+    .speed-slider{width:160px}
+    @media (max-width:900px){.layout{flex-direction:column;align-items:center}}
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <h1>矩阵乘法 — 动态演示（随机初始化）</h1>
+    </header>
+
+    <div class="controls card">
+      <div style="display:flex;gap:12px;align-items:end;flex-wrap:wrap">
+        <div>
+          <label>矩阵 A 行（m）</label>
+          <input id="m" type="number" min="1" max="8" value="3" />
+        </div>
+        <div>
+          <label>矩阵 A 列 / 矩阵 B 行（n）</label>
+          <input id="n" type="number" min="1" max="8" value="3" />
+        </div>
+        <div>
+          <label>矩阵 B 列（p）</label>
+          <input id="p" type="number" min="1" max="8" value="3" />
+        </div>
+
+        <div style="display:flex;flex-direction:column">
+          <label>动画速度</label>
+          <input id="speed" class="speed-slider" type="range" min="0.2" max="2" step="0.1" value="1" />
+          <div class="small muted">0.2x — 2x</div>
+        </div>
+
+        <div style="display:flex;gap:8px;align-items:center">
+          <button id="rand">随机初始化</button>
+          <button id="start">开始</button>
+          <button id="step" class="secondary">单步</button>
+          <button id="pause" class="secondary">暂停</button>
+          <button id="reset" class="secondary">重置</button>
+        </div>
+
+        <div style="margin-left:8px">
+          <label><input id="showIndices" type="checkbox" checked/> 显示索引</label>
+        </div>
+      </div>
+    </div>
+
+    <div class="layout">
+      <div class="matrix-area">
+        <div class="matrix-title">矩阵 A (m × n)</div>
+        <div id="matA" class="matrix card"></div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:8px;align-items:center">
+        <div class="muted small">×</div>
+      </div>
+
+      <div class="matrix-area">
+        <div class="matrix-title">矩阵 B (n × p)</div>
+        <div id="matB" class="matrix card"></div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:10px;align-items:center;margin-left:8px">
+        <div class="matrix-title">结果矩阵 C (m × p)</div>
+        <div id="matC" class="matrix card"></div>
+      </div>
+
+      <div class="sum-box card">
+        <div class="matrix-title">当前计算 (显示乘加过程)</div>
+        <div id="info" style="min-height:120px"></div>
+      </div>
+    </div>
+
+    <footer>说明：高亮显示当前正在计算的 A 的行与 B 的列；右侧显示当前元素计算的逐项乘加与中间和。</footer>
+  </div>
+
+  <script>
+    // 工具函数
+    const el = id => document.getElementById(id);
+
+    let A = [], B = [], C = [];
+    let m=3,n=3,p=3;
+    let running=false, anim=0;
+    let speed=1;
+
+    function randInt(min=-5,max=9){ return Math.floor(Math.random()*(max-min+1))+min }
+
+    function initMatrices(){
+      m = parseInt(el('m').value);
+      n = parseInt(el('n').value);
+      p = parseInt(el('p').value);
+      A = new Array(m).fill(0).map(()=>new Array(n).fill(0).map(()=>randInt()));
+      B = new Array(n).fill(0).map(()=>new Array(p).fill(0).map(()=>randInt()));
+      C = new Array(m).fill(0).map(()=>new Array(p).fill(0).map(()=>null));
+      renderAll();
+      resetState();
+    }
+
+    function renderMatrix(container, mat, rows, cols, type){
+      container.innerHTML='';
+      container.style.gridTemplateColumns = `repeat(${cols}, minmax(36px, 1fr))`;
+      for(let i=0;i<rows;i++){
+        for(let j=0;j<cols;j++){
+          const d = document.createElement('div');
+          d.className='cell';
+          d.dataset.i=i; d.dataset.j=j; d.id=`${type}-${i}-${j}`;
+          d.textContent = (mat[i][j]===null || mat[i][j]===undefined)?'':mat[i][j];
+          container.appendChild(d);
+        }
+      }
+    }
+
+    function renderAll(){
+      renderMatrix(el('matA'), A, m, n, 'A');
+      renderMatrix(el('matB'), B, n, p, 'B');
+      renderMatrix(el('matC'), C, m, p, 'C');
+      updateIndices();
+    }
+
+    function updateIndices(){
+      const show = el('showIndices').checked;
+      // add small indices overlay
+      ['A','B','C'].forEach(type=>{
+        document.querySelectorAll(`#mat${type} .cell`).forEach(cell=>{
+          const i = cell.dataset.i, j = cell.dataset.j;
+          if(show){
+            cell.classList.add('dim');
+            cell.textContent = (type==='A'?A[i][j]:(type==='B'?B[i][j]: (C[i][j]===null?'':C[i][j])));
+            const idx = document.createElement('div');
+            idx.style.position='absolute';
+            idx.style.fontSize='10px';
+            idx.style.opacity='0.6';
+          }else{
+            cell.classList.remove('dim');
+            cell.textContent = (type==='A'?A[i][j]:(type==='B'?B[i][j]: (C[i][j]===null?'':C[i][j])));
+          }
+        })
+      })
+    }
+
+    // state for animation
+    let state = {i:0,j:0,k:0,sum:0,phase:'idle'}; // computing C[i][j] by summing over k
+
+    function resetState(){ state = {i:0,j:0,k:0,sum:0,phase:'idle'}; updateUI(); }
+
+    function updateUI(){
+      // render C values (null -> empty)
+      for(let i=0;i<m;i++)for(let j=0;j<p;j++){
+        const node = document.getElementById(`C-${i}-${j}`);
+        if(node) node.textContent = (C[i][j]===null?'':C[i][j]);
+        node && node.classList.remove('highlight','col-highlight');
+      }
+      // clear A,B highlights
+      for(let i=0;i<m;i++)for(let j=0;j<n;j++){ const node=document.getElementById(`A-${i}-${j}`); node && node.classList.remove('highlight'); }
+      for(let i=0;i<n;i++)for(let j=0;j<p;j++){ const node=document.getElementById(`B-${i}-${j}`); node && node.classList.remove('col-highlight'); }
+
+      if(state.phase!=='idle'){
+        // highlight current row (A) and column (B)
+        for(let jj=0;jj<n;jj++){ const na=document.getElementById(`A-${state.i}-${jj}`); na && na.classList.add('highlight'); }
+        for(let ii=0;ii<n;ii++){ const nb=document.getElementById(`B-${ii}-${state.j}`); nb && nb.classList.add('col-highlight'); }
+        // highlight current multiplicands
+        const curA = document.getElementById(`A-${state.i}-${state.k}`);
+        const curB = document.getElementById(`B-${state.k}-${state.j}`);
+        curA && (curA.style.transform='scale(1.06)');
+        curA && (curA.style.border= '2px solid red');
+        curB && (curB.style.transform='scale(1.06)');
+        curB && (curB.style.border= '2px solid red');
+        // update info box
+        const info = el('info');
+        info.innerHTML='';
+        const title = document.createElement('div'); title.className='small muted'; title.textContent=`计算 C[${state.i}, ${state.j}]：`;
+        const details = document.createElement('div');
+        details.innerHTML = `<div class="step-row"><div>当前项: A[${state.i},${state.k}] × B[${state.k},${state.j}] = <strong>${A[state.i][state.k]} × ${B[state.k][state.j]} = ${A[state.i][state.k]*B[state.k][state.j]}</strong></div></div>`;
+        const sumLine = document.createElement('div'); sumLine.style.marginTop='8px';
+        sumLine.innerHTML = `<div>部分和（累加中）： <strong>${state.sum}</strong></div>`;
+        info.appendChild(title); info.appendChild(details); info.appendChild(sumLine);
+
+        // show previously finished elements of C
+        const done = document.createElement('div'); done.style.marginTop='12px'; done.innerHTML = '<div class="muted small">已完成的 C 矩阵（空 = 未计算）</div>';
+        const grid = document.createElement('div'); grid.style.display='grid'; grid.style.gridTemplateColumns = `repeat(${p}, 1fr)`; grid.style.gap='6px'; grid.style.marginTop='6px';
+        for(let ii=0;ii<m;ii++){
+          for(let jj=0;jj<p;jj++){
+            const box = document.createElement('div'); box.style.padding='6px'; box.style.borderRadius='6px'; box.style.background='rgba(255,255,255,0.02)';
+            box.textContent = (C[ii][jj]===null?'':C[ii][jj]);
+            if(ii===state.i && jj===state.j) box.style.outline='2px solid rgba(99,102,241,0.14)';
+            grid.appendChild(box);
+          }
+        }
+        done.appendChild(grid); info.appendChild(done);
+      }else{
+        el('info').innerHTML = '<div class="muted">点击“开始”以动画方式展示矩阵乘法的逐项乘加过程。或点击“单步”逐项计算。</div>';
+      }
+    }
+
+    // perform one micro-step (compute one multiplication A[i][k]*B[k][j] and add to sum)
+    function microStep(){
+      if(state.i>=m) { running=false; state.phase='idle'; updateUI(); return; }
+
+      state.phase='computing';
+      // multiply current items
+      const a = A[state.i][state.k];
+      const b = B[state.k][state.j];
+      const prod = a*b;
+      state.sum += prod;
+
+      // animate showing product briefly
+      updateUI();
+
+      // advance k
+      state.k++;
+      if(state.k>=n){
+        // finished C[i][j]
+        C[state.i][state.j] = state.sum;
+        // set small delay then move to next j
+        state.k = 0; state.sum = 0; state.j++;
+        if(state.j>=p){ state.j=0; state.i++; }
+        // small pause between finishing elements
+      }
+
+      // reset transforms after brief time
+      setTimeout(()=>{
+        // reset current scalings
+        document.querySelectorAll('.matrix .cell').forEach(c=>c.style.transform='');
+        renderAll();
+        updateUI();
+      }, 300/speed);
+    }
+
+    let autoTimer = null;
+    function startAnim(){ if(running) return; running=true; el('start').disabled=true; el('pause').disabled=false; 
+      animLoop(); }
+
+    function animLoop(){ if(!running) return; microStep(); const interval = 700/speed; autoTimer = setTimeout(animLoop, interval); }
+
+    function pauseAnim(){ running=false; el('start').disabled=false; el('pause').disabled=true; clearTimeout(autoTimer); }
+
+    function singleStep(){ if(running) return; // if animation running, ignore single-step
+      // perform one micro-step
+      microStep(); renderAll(); }
+
+    // event bindings
+    el('rand').addEventListener('click', ()=>{ initMatrices(); });
+    el('start').addEventListener('click', ()=>{ startAnim(); });
+    el('pause').addEventListener('click', ()=>{ pauseAnim(); });
+    el('step').addEventListener('click', ()=>{ singleStep(); });
+    el('reset').addEventListener('click', ()=>{ initMatrices(); C = new Array(m).fill(0).map(()=>new Array(p).fill(null)); resetState(); renderAll(); });
+    el('speed').addEventListener('input', (e)=>{ speed = parseFloat(e.target.value); });
+    el('m').addEventListener('change', ()=>initMatrices());
+    el('n').addEventListener('change', ()=>initMatrices());
+    el('p').addEventListener('change', ()=>initMatrices());
+    el('showIndices').addEventListener('change', ()=>updateIndices());
+
+    // initialize on load
+    initMatrices();
+    updateUI();
+  </script>
+</body>
+</html>

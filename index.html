@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>工具索引</title>
+    <!-- 引入 mdui 3 CSS 和 JS -->
+    <link rel="stylesheet" href="https://static.hzchu.top/mdui@2/mdui.css">
+    <script src="https://static.hzchu.top/mdui@2/mdui.global.js"></script>
+
+    <!-- Filled -->
+    <link
+    href="https://cfproxy.hzchu.top/https://fonts.googleapis.com/icon?family=Material+Icons"
+    rel="stylesheet"
+    />
+    <!-- favicon -->
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+        }
+
+        mdui-layout {
+            height: 100vh;
+        }
+
+        .category-section {
+            margin-bottom: 48px;
+        }
+
+        .category-title {
+            margin: 32px 0 24px 0;
+            padding-left: 16px;
+            color: var(--mdui-color-on-surface);
+            scroll-margin-top: 80px;
+        }
+
+        .tools-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 16px;
+            padding: 0 16px;
+        }
+
+        .tool-card {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .card-content {
+            padding: 16px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .card-title {
+            font-size: 1.25rem;
+            font-weight: 500;
+            margin: 0 0 8px 0;
+            color: var(--mdui-color-on-surface);
+        }
+
+        .card-description {
+            font-size: 0.875rem;
+            color: var(--mdui-color-on-surface-variant);
+            line-height: 1.5;
+            flex: 1;
+        }
+
+        mdui-navigation-drawer {
+            --shape-corner: 0;
+        }
+
+        .drawer-header {
+            padding: 24px 16px 16px 16px;
+            font-size: 1.5rem;
+            font-weight: 500;
+            color: var(--mdui-color-on-surface);
+        }
+
+        mdui-list-item {
+            border-radius: 28px;
+            margin: 4px 12px;
+        }
+
+        mdui-layout-main {
+            padding: 16px;
+            overflow-y: auto;
+        }
+
+        .app-bar-title {
+            font-size: 1.375rem;
+            font-weight: 500;
+        }
+
+        /* 响应式设计 */
+        @media (max-width: 768px) {
+            .tools-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (min-width: 769px) and (max-width: 1200px) {
+            .tools-grid {
+                grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            }
+        }
+    </style>
+</head>
+<body>
+    <mdui-layout>
+        <!-- 顶部应用栏 -->
+        <mdui-top-app-bar>
+            <mdui-button-icon icon="menu" id="menu-button"></mdui-button-icon>
+            <mdui-top-app-bar-title class="app-bar-title">工具索引</mdui-top-app-bar-title>
+        </mdui-top-app-bar>
+
+        <!-- 侧边抽屉栏 -->
+        <mdui-navigation-drawer open id="drawer">
+            <!-- <div class="drawer-header">分类</div> -->
+            <mdui-list id="category-list">
+                <!-- 动态生成分类列表 -->
+            </mdui-list>
+        </mdui-navigation-drawer>
+
+        <!-- 主内容区域 -->
+        <mdui-layout-main id="main-content">
+            <!-- 动态生成工具卡片 -->
+        </mdui-layout-main>
+    </mdui-layout>
+
+    <script>
+        // 从 list.json 加载数据
+        async function loadTools() {
+            try {
+                const response = await fetch('list.json');
+                const data = await response.json();
+                
+                // 数据已经按类别分组，直接转换为对象格式
+                const categorizedTools = {};
+                data.forEach(categoryGroup => {
+                    const category = categoryGroup.category || '未分类';
+                    categorizedTools[category] = categoryGroup.tools || [];
+                });
+
+                // 生成侧边栏分类列表
+                generateCategoryList(categorizedTools);
+                
+                // 生成主内容区的工具卡片
+                generateToolCards(categorizedTools);
+                
+                // 设置侧边栏点击事件
+                setupCategoryNavigation();
+            } catch (error) {
+                console.error('加载工具列表失败:', error);
+                document.getElementById('main-content').innerHTML = 
+                    '<p style="padding: 16px; color: var(--mdui-color-error);">加载工具列表失败，请检查 list.json 文件。</p>';
+            }
+        }
+
+        // 生成侧边栏分类列表
+        function generateCategoryList(categorizedTools) {
+            const categoryList = document.getElementById('category-list');
+            categoryList.innerHTML = '';
+            
+            Object.keys(categorizedTools).forEach(category => {
+                const listItem = document.createElement('mdui-list-item');
+                const categoryId = getCategoryId(category);
+                listItem.setAttribute('data-category', categoryId);
+                listItem.textContent = category;
+                categoryList.appendChild(listItem);
+            });
+        }
+
+        // 生成主内容区的工具卡片
+        function generateToolCards(categorizedTools) {
+            const mainContent = document.getElementById('main-content');
+            mainContent.innerHTML = '';
+
+            Object.entries(categorizedTools).forEach(([category, tools]) => {
+                const categoryId = getCategoryId(category);
+                
+                // 创建分类区域
+                const section = document.createElement('div');
+                section.className = 'category-section';
+                
+                // 创建分类标题
+                const title = document.createElement('h2');
+                title.className = 'category-title';
+                title.id = categoryId;
+                title.textContent = category;
+                section.appendChild(title);
+                
+                // 创建工具网格
+                const grid = document.createElement('div');
+                grid.className = 'tools-grid';
+                
+                // 为每个工具创建卡片
+                tools.forEach(tool => {
+                    const card = createToolCard(tool);
+                    grid.appendChild(card);
+                });
+                
+                section.appendChild(grid);
+                mainContent.appendChild(section);
+            });
+        }
+
+        // 创建工具卡片
+        function createToolCard(tool) {
+            const card = document.createElement('mdui-card');
+            card.className = 'tool-card';
+            card.setAttribute('clickable', '');
+            
+            if (tool.url) {
+                card.setAttribute('href', tool.url);
+                card.setAttribute('target', '_blank');
+            }
+            
+            const cardContent = document.createElement('div');
+            cardContent.className = 'card-content';
+            
+            const title = document.createElement('div');
+            title.className = 'card-title';
+            title.textContent = tool.title || '工具名称';
+            
+            const description = document.createElement('div');
+            description.className = 'card-description';
+            description.textContent = tool.description || '工具解释';
+            
+            cardContent.appendChild(title);
+            cardContent.appendChild(description);
+            card.appendChild(cardContent);
+            
+            return card;
+        }
+
+        // 获取分类 ID（用于锚点）
+        function getCategoryId(category) {
+            return 'category-' + encodeURIComponent(category).replace(/%/g, '-');
+        }
+
+        // 设置分类导航
+        function setupCategoryNavigation() {
+            const categoryItems = document.querySelectorAll('#category-list mdui-list-item');
+            categoryItems.forEach(item => {
+                item.addEventListener('click', () => {
+                    const categoryId = item.getAttribute('data-category');
+                    const targetElement = document.getElementById(categoryId);
+                    if (targetElement) {
+                        targetElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
+                });
+            });
+        }
+
+        // 设置菜单按钮切换侧边栏
+        document.getElementById('menu-button').addEventListener('click', () => {
+            const drawer = document.getElementById('drawer');
+            drawer.open = !drawer.open;
+        });
+
+        // 在窗口大小变化时处理侧边栏显示
+        function handleResize() {
+            const drawer = document.getElementById('drawer');
+            if (window.innerWidth < 840) {
+                drawer.setAttribute('modal', '');
+                drawer.setAttribute('close-on-overlay-click', '');
+                drawer.open = false;
+            } else {
+                drawer.removeAttribute('modal');
+                drawer.removeAttribute('close-on-overlay-click');
+                drawer.open = true;
+            }
+        }
+
+        // 初始化
+        window.addEventListener('load', () => {
+            loadTools();
+            handleResize();
+        });
+
+        window.addEventListener('resize', handleResize);
+    </script>
+</body>
+</html>

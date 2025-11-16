@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>抽签分组并分配任务（双人小组）</title>
+  <style>
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,'Noto Sans CJK SC',"Microsoft Yahei",Arial;margin:24px;background:#f7fafc;color:#0f172a}
+    .card{background:#fff;border-radius:12px;padding:18px;box-shadow:0 6px 20px rgba(15,23,42,0.08);max-width:980px;margin:0 auto}
+    h1{font-size:20px;margin:0 0 12px}
+    textarea{width:100%;min-height:120px;padding:10px;border-radius:8px;border:1px solid #e6edf3;resize:vertical}
+    .row{display:flex;gap:12px;align-items:center;margin-top:12px}
+    .btn{padding:8px 12px;border-radius:8px;border:0;background:#0ea5a4;color:white;cursor:pointer}
+    .btn.secondary{background:#64748b}
+    table{width:100%;border-collapse:collapse;margin-top:16px}
+    th,td{padding:10px;border-bottom:1px solid #eef2f7;text-align:left}
+    th{background:#f1f5f9}
+    .muted{color:#64748b;font-size:13px}
+    .small{font-size:13px}
+    .controls{display:flex;gap:8px;flex-wrap:wrap}
+    .sample{background:#f8fafc;border-radius:6px;padding:8px;font-size:13px;color:#334155}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>抽签系统 — 随机分成双人小组并分配4项任务</h1>
+    <div class="muted">说明：每行输入一个姓名。系统会随机两两配对（若人数为奇数，最后一组会是三人）。随后从所有组中随机选出4个组来分别承担 1) 扫拖地 2) 讲台 3) 窗台黑板 4) 擦课桌。如果组数少于4，会允许同一组承担多个任务（随机）。</div>
+
+    <div style="margin-top:12px">名单（一行一个姓名）：</div>
+    <textarea id="names" placeholder="例：\n张三\n李四\n王五\n赵六\n...">张三
+李四
+王五
+赵六
+钱七
+孙八
+周九
+吴十</textarea>
+
+    <div class="row">
+      <div class="controls">
+        <button class="btn" id="generate">生成分组并抽取任务</button>
+        <button class="btn secondary" id="shuffleSample">填入示例名单</button>
+        <button class="btn secondary" id="exportCsv">导出 CSV</button>
+      </div>
+    </div>
+
+    <div id="result"></div>
+  </div>
+
+  <script>
+    // 任务列表
+    const TASKS = ['扫拖地','讲台','窗台黑板','擦课桌'];
+
+    // 使用加密随机（如果可用）做 Fisher-Yates 洗牌
+    function randomInt(max){
+      if(window.crypto && crypto.getRandomValues){
+        const arr = new Uint32Array(1);
+        crypto.getRandomValues(arr);
+        return arr[0] % max;
+      }
+      return Math.floor(Math.random()*max);
+    }
+
+    function shuffle(array){
+      const a = array.slice();
+      for(let i=a.length-1;i>0;i--){
+        const j = randomInt(i+1);
+        [a[i],a[j]]=[a[j],a[i]];
+      }
+      return a;
+    }
+
+    function makePairs(names){
+      const shuffled = shuffle(names);
+      const groups = [];
+      for(let i=0;i<shuffled.length;i+=2){
+        if(i+1<shuffled.length){
+          groups.push([shuffled[i],shuffled[i+1]]);
+        }else{
+          // 如果是最后一个单独的，合并到前一组（变成三人）
+          if(groups.length>0){
+            groups[groups.length-1].push(shuffled[i]);
+          }else{
+            groups.push([shuffled[i]]);
+          }
+        }
+      }
+      return groups;
+    }
+
+    function pickGroupsForTasks(groups){
+      const n = groups.length;
+      const idxs = [];
+      if(n>=TASKS.length){
+        // 不重复选择
+        const order = shuffle(Array.from({length:n},(_,i)=>i));
+        for(let t=0;t<TASKS.length;t++) idxs.push(order[t]);
+      }else{
+        // 组数少于任务数，允许重复选择（随机）
+        for(let t=0;t<TASKS.length;t++) idxs.push(randomInt(n));
+      }
+      return idxs; // 长度为 TASKS.length 的组索引数组
+    }
+
+    function assignTasks(groups){
+      const assignment = groups.map(() => ({tasks: []}));
+      const picked = pickGroupsForTasks(groups);
+      for(let i=0;i<TASKS.length;i++){
+        const g = picked[i];
+        assignment[g].tasks.push(TASKS[i]);
+      }
+      return assignment; // 与 groups 同长度的数组，包含 tasks 列表
+    }
+
+    function renderTable(groups, assignment){
+      let html = '';
+      html += '<table><thead><tr><th style="width:8%">组号</th><th style="width:45%">成员</th><th>分配任务</th></tr></thead><tbody>';
+      for(let i=0;i<groups.length;i++){
+        const members = groups[i].join('，');
+        const tasks = assignment[i].tasks.length? assignment[i].tasks.join(' / '):'<span class="muted">无</span>';
+        html += `<tr><td>${i+1}</td><td>${escapeHtml(members)}</td><td>${escapeHtml(tasks)}</td></tr>`;
+      }
+      html += '</tbody></table>';
+      return html;
+    }
+
+    function escapeHtml(s){
+      if(typeof s !== 'string') return s;
+      return s.replace(/[&<>\"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\\':'\\\\'})[c]);
+    }
+
+    function exportCsv(groups, assignment){
+      const rows = [['组号','成员','分配任务']];
+      for(let i=0;i<groups.length;i++){
+        rows.push([i+1, groups[i].join(' / '), assignment[i].tasks.join(' / ') ]);
+      }
+      const csv = rows.map(r => r.map(cell => '"'+String(cell).replace(/"/g,'""')+'"').join(',')).join('\n');
+      const blob = new Blob([csv],{type:'text/csv;charset=utf-8;'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = '分组任务分配.csv';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    }
+
+    document.getElementById('generate').addEventListener('click', ()=>{
+      const raw = document.getElementById('names').value.trim();
+      if(!raw){
+        alert('请在文本框中输入至少一个姓名（每行一个）。');
+        return;
+      }
+      const names = raw.split('\n').map(s=>s.trim()).filter(s=>s.length>0);
+      if(names.length===0){ alert('找不到有效姓名。'); return; }
+
+      const groups = makePairs(names);
+      const assignment = assignTasks(groups);
+      const tableHtml = renderTable(groups, assignment);
+      const info = `<div class="small">共 ${names.length} 人，分成 ${groups.length} 组（若最后一组为三人则为三人组）。随机选出 ${TASKS.length} 个组来承担四项任务。</div>`;
+      document.getElementById('result').innerHTML = info + tableHtml;
+
+      // 将数据保存在 element 上，供导出使用
+      document.getElementById('result').dataset.groups = JSON.stringify(groups);
+      document.getElementById('result').dataset.assignment = JSON.stringify(assignment);
+    });
+
+    document.getElementById('exportCsv').addEventListener('click', ()=>{
+      const el = document.getElementById('result');
+      if(!el.dataset.groups){ alert('请先生成一次分配结果，然后再导出。'); return; }
+      const groups = JSON.parse(el.dataset.groups);
+      const assignment = JSON.parse(el.dataset.assignment);
+      exportCsv(groups, assignment);
+    });
+
+    document.getElementById('shuffleSample').addEventListener('click', ()=>{
+      const sample = ['陈一','李二','张三','王四','赵五','钱六','孙七','周八','吴九'];
+      document.getElementById('names').value = sample.join('\n');
+    });
+
+  </script>
+</body>
+</html>

@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>文本缩进移除工具</title>
+    <!-- 引入 mdui 3 CSS 和 JS -->
+    <link rel="stylesheet" href="https://static.hzchu.top/mdui@2/mdui.css">
+    <script src="https://static.hzchu.top/mdui@2/mdui.global.js"></script>
+
+    <!-- Filled -->
+    <link
+    href="https://cfproxy.hzchu.top/https://fonts.googleapis.com/icon?family=Material+Icons"
+    rel="stylesheet"
+    />
+    <!-- favicon -->
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--mdui-color-surface-container);
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 24px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 32px;
+        }
+
+        .header h1 {
+            font-size: 2rem;
+            font-weight: 500;
+            color: var(--mdui-color-on-surface);
+            margin: 0 0 8px 0;
+        }
+
+        .header p {
+            font-size: 1rem;
+            color: var(--mdui-color-on-surface-variant);
+            margin: 0;
+        }
+
+        .tool-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            margin-bottom: 24px;
+        }
+
+        @media (max-width: 960px) {
+            .tool-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .section-card {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            padding: 0 4px;
+        }
+
+        .card-title {
+            font-size: 1.25rem;
+            font-weight: 500;
+            color: var(--mdui-color-on-surface);
+        }
+
+        .text-area-container {
+            position: relative;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        mdui-text-field {
+            flex: 1;
+        }
+
+        .char-count {
+            font-size: 0.875rem;
+            color: var(--mdui-color-on-surface-variant);
+            text-align: right;
+            margin-top: 8px;
+            padding: 0 4px;
+        }
+
+        .options-card {
+            margin-top: 16px;
+        }
+
+        .option-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 16px;
+        }
+
+        .option-label {
+            color: var(--mdui-color-on-surface-variant);
+            font-size: 0.875rem;
+        }
+
+        .controls {
+            display: flex;
+            gap: 12px;
+            margin-top: 16px;
+            flex-wrap: wrap;
+        }
+
+        .info-chip {
+            display: inline-flex;
+            align-items: center;
+            padding: 16px;
+        }
+
+        .info-text {
+            color: var(--mdui-color-on-surface-variant);
+            font-size: 0.875rem;
+        }
+
+        /* 自定义文本框样式 */
+        mdui-text-field::part(input) {
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            line-height: 1.6;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>文本缩进移除工具</h1>
+            <p>移除文本每行前的缩进（空格或制表符），可指定移除数量</p>
+        </div>
+
+        <div class="tool-grid">
+            <!-- 输入区域 -->
+            <mdui-card variant="elevated" class="section-card">
+                <div style="padding: 20px; display: flex; flex-direction: column; height: 100%;">
+                    <div class="card-header">
+                        <span class="card-title">输入文本</span>
+                        <mdui-button-icon icon="delete" id="clear-btn"></mdui-button-icon>
+                    </div>
+
+                    <div class="text-area-container">
+                        <mdui-text-field
+                            id="input-text"
+                            label="请输入带有缩进的文本"
+                            placeholder="在此处粘贴或输入文本..."
+                            rows="12"
+                            autosize
+                            style="width: 100%;">
+                        </mdui-text-field>
+                        <div class="char-count">
+                            <span id="input-count">0</span> 字符
+                        </div>
+                    </div>
+
+                    <mdui-card variant="outlined" class="options-card">
+                        <div class="option-row">
+                            <span class="option-label">移除缩进数量:</span>
+                            <mdui-text-field
+                                id="indent-amount"
+                                type="number"
+                                value="2"
+                                min="1"
+                                style="width: 80px;">
+                            </mdui-text-field>
+                            <span class="option-label">个空格</span>
+                        </div>
+                    </mdui-card>
+
+                    <div class="controls">
+                        <mdui-button variant="outlined" icon="text_snippet" id="example-btn">
+                            插入示例
+                        </mdui-button>
+                        <mdui-button variant="filled" icon="play_arrow" id="process-btn">
+                            处理文本
+                        </mdui-button>
+                    </div>
+                </div>
+            </mdui-card>
+
+            <!-- 输出区域 -->
+            <mdui-card variant="elevated" class="section-card">
+                <div style="padding: 20px; display: flex; flex-direction: column; height: 100%;">
+                    <div class="card-header">
+                        <span class="card-title">输出文本</span>
+                        <mdui-button-icon icon="content_copy" id="copy-btn"></mdui-button-icon>
+                    </div>
+
+                    <div class="text-area-container">
+                        <mdui-text-field
+                            id="output-text"
+                            label="处理后的文本"
+                            placeholder="处理后的文本将显示在这里..."
+                            rows="12"
+                            readonly
+                            autosize
+                            style="width: 100%;">
+                        </mdui-text-field>
+                        <div class="char-count">
+                            <span id="output-count">0</span> 字符
+                        </div>
+                    </div>
+
+                    <mdui-card variant="outlined" class="options-card">
+                        <div class="info-chip">
+                            <mdui-icon name="info" style="margin-right: 8px;"></mdui-icon>
+                            <span class="info-text" id="process-info">等待处理...</span>
+                        </div>
+                    </mdui-card>
+
+                    <div class="controls">
+                        <mdui-button variant="outlined" icon="select_all" id="select-all-btn">
+                            全选输出
+                        </mdui-button>
+                        <mdui-button variant="tonal" icon="clear" id="clear-output-btn">
+                            清除输出
+                        </mdui-button>
+                    </div>
+                </div>
+            </mdui-card>
+        </div>
+    </div>
+
+    <script>
+        const { snackbar } = mdui;
+
+        document.addEventListener('DOMContentLoaded', function() {
+            const inputText = document.getElementById('input-text');
+            const outputText = document.getElementById('output-text');
+            const indentAmount = document.getElementById('indent-amount');
+            const processBtn = document.getElementById('process-btn');
+            const copyBtn = document.getElementById('copy-btn');
+            const clearBtn = document.getElementById('clear-btn');
+            const clearOutputBtn = document.getElementById('clear-output-btn');
+            const exampleBtn = document.getElementById('example-btn');
+            const selectAllBtn = document.getElementById('select-all-btn');
+            const inputCount = document.getElementById('input-count');
+            const outputCount = document.getElementById('output-count');
+            const processInfo = document.getElementById('process-info');
+            
+            // 更新字符计数
+            function updateCharCount() {
+                inputCount.textContent = inputText.value.length;
+                outputCount.textContent = outputText.value.length;
+            }
+            
+            // 插入示例文本
+            exampleBtn.addEventListener('click', function() {
+                const example = `  这是一段示例文本
+      每行前面有不同数量的缩进
+          这个工具将帮助您移除它们
+    您可以指定要移除的缩进数量
+        然后轻松获得整洁的文本`;
+                
+                inputText.value = example;
+                updateCharCount();
+                processText();
+                snackbar({ message: '已插入示例文本' });
+            });
+            
+            // 处理文本
+            function processText() {
+                const text = inputText.value;
+                
+                if (!text.trim()) {
+                    processInfo.textContent = '请先输入文本';
+                    snackbar({ message: '请先输入文本', placement: 'top' });
+                    return;
+                }
+                
+                const lines = text.split('\n');
+                const removeCount = parseInt(indentAmount.value);
+                
+                if (isNaN(removeCount) || removeCount < 1) {
+                    processInfo.textContent = '错误：请输入有效的缩进数量';
+                    outputText.value = '';
+                    updateCharCount();
+                    snackbar({ message: '请输入有效的缩进数量', placement: 'top' });
+                    return;
+                }
+                
+                const processedLines = lines.map(line => {
+                    let spaceCount = 0;
+                    // 计算行前的空格数
+                    for (let i = 0; i < line.length; i++) {
+                        if (line[i] === ' ') {
+                            spaceCount++;
+                        } else if (line[i] === '\t') {
+                            spaceCount += 4; // 将制表符视为4个空格
+                        } else {
+                            break;
+                        }
+                    }
+                    
+                    // 移除指定数量的缩进
+                    const removeActual = Math.min(spaceCount, removeCount);
+                    return line.substring(removeActual);
+                });
+                
+                outputText.value = processedLines.join('\n');
+                processInfo.textContent = `已处理 ${lines.length} 行文本`;
+                updateCharCount();
+                // snackbar({ message: `已成功处理 ${lines.length} 行文本`, placement: 'top' });
+            }
+            
+            // 绑定处理按钮事件
+            processBtn.addEventListener('click', processText);
+            
+            // 实时更新字符计数
+            inputText.addEventListener('input', updateCharCount);
+            outputText.addEventListener('input', updateCharCount);
+            
+            // 复制文本
+            copyBtn.addEventListener('click', async function() {
+                if (!outputText.value) {
+                    snackbar({ message: '输出文本为空', placement: 'top' });
+                    return;
+                }
+                
+                try {
+                    await navigator.clipboard.writeText(outputText.value);
+                    snackbar({ message: '已复制到剪贴板', placement: 'top' });
+                } catch (err) {
+                    // 降级方案
+                    outputText.select();
+                    document.execCommand('copy');
+                    snackbar({ message: '已复制到剪贴板', placement: 'top' });
+                }
+            });
+            
+            // 清除输入
+            clearBtn.addEventListener('click', function() {
+                inputText.value = '';
+                updateCharCount();
+                processInfo.textContent = '等待处理...';
+                snackbar({ message: '已清除输入', placement: 'top' });
+            });
+            
+            // 清除输出
+            clearOutputBtn.addEventListener('click', function() {
+                outputText.value = '';
+                updateCharCount();
+                processInfo.textContent = '等待处理...';
+                snackbar({ message: '已清除输出', placement: 'top' });
+            });
+            
+            // 全选输出
+            selectAllBtn.addEventListener('click', function() {
+                if (!outputText.value) {
+                    snackbar({ message: '输出文本为空', placement: 'top' });
+                    return;
+                }
+                outputText.select();
+                snackbar({ message: '已全选输出文本', placement: 'top' });
+            });
+            
+            // 初始化字符计数
+            updateCharCount();
+        });
+    </script>
+</body>
+</html>
