@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>去除文本换行</title>
+    <!-- 引入 mdui 3 CSS 和 JS -->
+    <link rel="stylesheet" href="https://static.hzchu.top/mdui@2/mdui.css">
+    <script src="https://static.hzchu.top/mdui@2/mdui.global.js"></script>
+
+    <!-- Filled -->
+    <link
+    href="https://cfproxy.hzchu.top/https://fonts.googleapis.com/icon?family=Material+Icons"
+    rel="stylesheet"
+    />
+    <!-- favicon -->
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--mdui-color-surface-container);
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 24px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 32px;
+        }
+
+        .header h1 {
+            font-size: 2rem;
+            font-weight: 500;
+            color: var(--mdui-color-on-surface);
+            margin: 0 0 8px 0;
+        }
+
+        .header p {
+            font-size: 1rem;
+            color: var(--mdui-color-on-surface-variant);
+            margin: 0;
+        }
+
+        .tool-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            margin-bottom: 24px;
+        }
+
+        @media (max-width: 960px) {
+            .tool-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .section-card {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            padding: 0 4px;
+        }
+
+        .card-title {
+            font-size: 1.25rem;
+            font-weight: 500;
+            color: var(--mdui-color-on-surface);
+        }
+
+        .text-area-container {
+            position: relative;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        mdui-text-field {
+            flex: 1;
+        }
+
+        .char-count {
+            font-size: 0.875rem;
+            color: var(--mdui-color-on-surface-variant);
+            text-align: right;
+            margin-top: 8px;
+            padding: 0 4px;
+        }
+
+        .options-card {
+            margin-top: 16px;
+        }
+
+        .option-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 16px;
+            flex-wrap: wrap;
+        }
+
+        .option-label {
+            color: var(--mdui-color-on-surface-variant);
+            font-size: 0.875rem;
+        }
+
+        .controls {
+            display: flex;
+            gap: 12px;
+            margin-top: 16px;
+            flex-wrap: wrap;
+        }
+
+        .info-chip {
+            display: inline-flex;
+            align-items: center;
+            padding: 16px;
+        }
+
+        .info-text {
+            color: var(--mdui-color-on-surface-variant);
+            font-size: 0.875rem;
+        }
+
+        .stats {
+            display: flex;
+            gap: 16px;
+            margin-top: 12px;
+            padding: 12px;
+            background-color: var(--mdui-color-surface-container-high);
+            border-radius: 8px;
+            flex-wrap: wrap;
+        }
+
+        .stat-item {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .stat-label {
+            font-size: 0.75rem;
+            color: var(--mdui-color-on-surface-variant);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .stat-value {
+            font-size: 1.25rem;
+            font-weight: 500;
+            color: var(--mdui-color-on-surface);
+        }
+
+        /* 自定义文本框样式 */
+        mdui-text-field::part(input) {
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            line-height: 1.6;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>去除文本换行</h1>
+            <p>将多行文本合并为单行，支持保留段落分隔和空格处理选项</p>
+        </div>
+
+        <div class="tool-grid">
+            <!-- 输入区域 -->
+            <mdui-card variant="elevated" class="section-card">
+                <div style="padding: 20px; display: flex; flex-direction: column; height: 100%;">
+                    <div class="card-header">
+                        <span class="card-title">输入文本</span>
+                        <mdui-button-icon icon="delete" id="clear-btn"></mdui-button-icon>
+                    </div>
+
+                    <div class="text-area-container">
+                        <mdui-text-field
+                            id="input-text"
+                            label="请输入多行文本"
+                            placeholder="在此处粘贴或输入多行文本..."
+                            rows="12"
+                            autosize
+                            style="width: 100%;">
+                        </mdui-text-field>
+                        <div class="char-count">
+                            <span id="input-count">0</span> 字符 · <span id="input-lines">0</span> 行
+                        </div>
+                    </div>
+
+                    <mdui-card variant="outlined" class="options-card">
+                        <div class="option-row">
+                            <mdui-checkbox id="keep-paragraph" checked>
+                                保留段落分隔
+                            </mdui-checkbox>
+                            <mdui-checkbox id="keep-space">
+                                保留空格
+                            </mdui-checkbox>
+                            <mdui-checkbox id="trim-lines" checked>
+                                去除行首尾空格
+                            </mdui-checkbox>
+                        </div>
+                    </mdui-card>
+
+                    <div class="controls">
+                        <mdui-button variant="outlined" icon="text_snippet" id="example-btn">
+                            插入示例
+                        </mdui-button>
+                        <mdui-button variant="filled" icon="play_arrow" id="process-btn">
+                            处理文本
+                        </mdui-button>
+                    </div>
+                </div>
+            </mdui-card>
+
+            <!-- 输出区域 -->
+            <mdui-card variant="elevated" class="section-card">
+                <div style="padding: 20px; display: flex; flex-direction: column; height: 100%;">
+                    <div class="card-header">
+                        <span class="card-title">输出文本</span>
+                        <mdui-button-icon icon="content_copy" id="copy-btn"></mdui-button-icon>
+                    </div>
+
+                    <div class="text-area-container">
+                        <mdui-text-field
+                            id="output-text"
+                            label="处理后的文本"
+                            placeholder="处理后的文本将显示在这里..."
+                            rows="12"
+                            readonly
+                            autosize
+                            style="width: 100%;">
+                        </mdui-text-field>
+                        <div class="char-count">
+                            <span id="output-count">0</span> 字符 · <span id="output-lines">0</span> 行
+                        </div>
+                    </div>
+
+                    <mdui-card variant="outlined" class="options-card">
+                        <div class="stats">
+                            <div class="stat-item">
+                                <span class="stat-label">减少行数</span>
+                                <span class="stat-value" id="lines-reduced">0</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-label">字符变化</span>
+                                <span class="stat-value" id="chars-changed">0</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-label">处理状态</span>
+                                <span class="stat-value" id="process-status" style="font-size: 0.875rem;">等待处理</span>
+                            </div>
+                        </div>
+                    </mdui-card>
+
+                    <div class="controls">
+                        <mdui-button variant="outlined" icon="select_all" id="select-all-btn">
+                            全选输出
+                        </mdui-button>
+                        <mdui-button variant="tonal" icon="clear" id="clear-output-btn">
+                            清除输出
+                        </mdui-button>
+                    </div>
+                </div>
+            </mdui-card>
+        </div>
+
+        <!-- 说明卡片 -->
+        <mdui-card variant="outlined">
+            <div style="padding: 20px;">
+                <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
+                    <mdui-icon name="info" style="color: var(--mdui-color-primary);"></mdui-icon>
+                    <span style="font-size: 1.125rem; font-weight: 500; color: var(--mdui-color-on-surface);">使用说明</span>
+                </div>
+                <div style="color: var(--mdui-color-on-surface-variant); line-height: 1.8;">
+                    <ul style="margin: 0; padding-left: 24px;">
+                        <li><strong>保留段落分隔：</strong>空行（连续的换行符）将被保留为段落分隔符</li>
+                        <li><strong>保留空格：</strong>行与行之间合并时保留一个空格，否则直接连接</li>
+                        <li><strong>去除行首尾空格：</strong>去除每行开头和结尾的空白字符</li>
+                        <li><strong>典型应用：</strong>PDF 复制的文本整理、邮件内容格式化、代码注释清理等</li>
+                    </ul>
+                </div>
+            </div>
+        </mdui-card>
+    </div>
+
+    <script>
+        const { snackbar } = mdui;
+
+        document.addEventListener('DOMContentLoaded', function() {
+            const inputText = document.getElementById('input-text');
+            const outputText = document.getElementById('output-text');
+            const processBtn = document.getElementById('process-btn');
+            const copyBtn = document.getElementById('copy-btn');
+            const clearBtn = document.getElementById('clear-btn');
+            const clearOutputBtn = document.getElementById('clear-output-btn');
+            const exampleBtn = document.getElementById('example-btn');
+            const selectAllBtn = document.getElementById('select-all-btn');
+            
+            const keepParagraph = document.getElementById('keep-paragraph');
+            const keepSpace = document.getElementById('keep-space');
+            const trimLines = document.getElementById('trim-lines');
+            
+            const inputCount = document.getElementById('input-count');
+            const outputCount = document.getElementById('output-count');
+            const inputLines = document.getElementById('input-lines');
+            const outputLines = document.getElementById('output-lines');
+            const linesReduced = document.getElementById('lines-reduced');
+            const charsChanged = document.getElementById('chars-changed');
+            const processStatus = document.getElementById('process-status');
+            
+            // 更新字符计数
+            function updateCharCount() {
+                const inputValue = inputText.value;
+                const outputValue = outputText.value;
+                
+                inputCount.textContent = inputValue.length;
+                outputCount.textContent = outputValue.length;
+                
+                const inputLineCount = inputValue ? inputValue.split('\n').length : 0;
+                const outputLineCount = outputValue ? outputValue.split('\n').length : 0;
+                
+                inputLines.textContent = inputLineCount;
+                outputLines.textContent = outputLineCount;
+                
+                // 更新统计
+                linesReduced.textContent = inputLineCount - outputLineCount;
+                charsChanged.textContent = (outputValue.length - inputValue.length > 0 ? '+' : '') + 
+                    (outputValue.length - inputValue.length);
+            }
+            
+            // 插入示例文本
+            exampleBtn.addEventListener('click', function() {
+                const example = `这是第一段文字，
+它被分成了多行。
+每一行都有换行符。
+
+这是第二段文字，
+前面有一个空行。
+这样可以测试段落分隔功能。
+
+    这一行前面有缩进空格。
+这一行后面有空格。    
+这样可以测试空格处理功能。`;
+                
+                inputText.value = example;
+                updateCharCount();
+                processText();
+                snackbar({ message: '已插入示例文本', placement: 'top' });
+            });
+            
+            // 处理文本
+            function processText() {
+                const text = inputText.value;
+                
+                if (!text.trim()) {
+                    processStatus.textContent = '请先输入文本';
+                    snackbar({ message: '请先输入文本', placement: 'top' });
+                    return;
+                }
+                
+                let result = text;
+                
+                if (keepParagraph.checked) {
+                    // 保留段落：将多个连续换行符替换为特殊标记
+                    result = result.replace(/\n\s*\n/g, '<<<PARAGRAPH>>>');
+                }
+                
+                // 分割成行
+                let lines = result.split('\n');
+                
+                // 处理每一行
+                if (trimLines.checked) {
+                    lines = lines.map(line => line.trim());
+                }
+                
+                // 合并行
+                if (keepSpace.checked) {
+                    result = lines.join(' ');
+                } else {
+                    result = lines.join('');
+                }
+                
+                // 恢复段落分隔
+                if (keepParagraph.checked) {
+                    result = result.replace(/<<<PARAGRAPH>>>/g, '\n\n');
+                    // 清理多余的空格
+                    result = result.replace(/ +\n/g, '\n').replace(/\n +/g, '\n');
+                }
+                
+                // 清理多余的空格
+                if (!keepSpace.checked) {
+                    result = result.replace(/\s+/g, ' ').trim();
+                } else {
+                    result = result.replace(/ +/g, ' ').trim();
+                }
+                
+                outputText.value = result;
+                processStatus.textContent = '处理完成';
+                updateCharCount();
+                
+                snackbar({ message: '文本处理完成', placement: 'top' });
+            }
+            
+            // 绑定处理按钮事件
+            processBtn.addEventListener('click', processText);
+            
+            // 实时更新字符计数
+            inputText.addEventListener('input', updateCharCount);
+            outputText.addEventListener('input', updateCharCount);
+            
+            // 选项变化时自动处理
+            keepParagraph.addEventListener('change', () => {
+                if (inputText.value) processText();
+            });
+            keepSpace.addEventListener('change', () => {
+                if (inputText.value) processText();
+            });
+            trimLines.addEventListener('change', () => {
+                if (inputText.value) processText();
+            });
+            
+            // 复制文本
+            copyBtn.addEventListener('click', async function() {
+                if (!outputText.value) {
+                    snackbar({ message: '输出文本为空', placement: 'top' });
+                    return;
+                }
+                
+                try {
+                    await navigator.clipboard.writeText(outputText.value);
+                    snackbar({ message: '已复制到剪贴板', placement: 'top' });
+                } catch (err) {
+                    // 降级方案
+                    outputText.select();
+                    document.execCommand('copy');
+                    snackbar({ message: '已复制到剪贴板', placement: 'top' });
+                }
+            });
+            
+            // 清除输入
+            clearBtn.addEventListener('click', function() {
+                inputText.value = '';
+                updateCharCount();
+                processStatus.textContent = '等待处理';
+                snackbar({ message: '已清除输入', placement: 'top' });
+            });
+            
+            // 清除输出
+            clearOutputBtn.addEventListener('click', function() {
+                outputText.value = '';
+                updateCharCount();
+                processStatus.textContent = '等待处理';
+                snackbar({ message: '已清除输出', placement: 'top' });
+            });
+            
+            // 全选输出
+            selectAllBtn.addEventListener('click', function() {
+                if (!outputText.value) {
+                    snackbar({ message: '输出文本为空', placement: 'top' });
+                    return;
+                }
+                outputText.select();
+                snackbar({ message: '已全选输出文本', placement: 'top' });
+            });
+            
+            // 初始化字符计数
+            updateCharCount();
+        });
+    </script>
+</body>
+</html>

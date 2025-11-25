@@ -11,7 +11,13 @@
                 "title": "移除文本缩进",
                 "description": "移除文本每行前的缩进（空格或制表符），可指定移除数量。",
                 "url": "html/移除文本缩进/index.html"
+            },
+            {
+                "title": "去除文本换行",
+                "description": "去除文本中的换行符，合并为一行文本。",
+                "url": "html/去除文本换行/index.html"
             }
+            
         ]
     },
     {
