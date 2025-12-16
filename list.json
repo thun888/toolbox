@@ -27,6 +27,11 @@
                 "title": "矩阵乘法动态演示",
                 "description": "矩阵乘法动态演示",
                 "url": "html/矩阵乘法动态演示/index.html"
+            },
+            {
+                "title": "可视化展示浮点数或整型",
+                "description": "可视化展示浮点数或整型在内存中二进制的存储状态",
+                "url": "html/可视化展示浮点数或整型/index.html"
             }
         ]
     },

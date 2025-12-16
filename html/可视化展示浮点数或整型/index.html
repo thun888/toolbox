@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>C语言数据类型内存可视化工具</title>
+    <style>
+        :root {
+            --bg-color: #f0f2f5;
+            --card-bg: #ffffff;
+            --text-color: #333;
+            --sign-color: #ff6b6b;
+            --exp-color: #51cf66;
+            --mantissa-color: #4dabf7;
+            --int-color: #868e96;
+            --border-color: #e9ecef;
+            --unsigned-color: #9775fa;
+        }
+
+        body {
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            margin: 0;
+        }
+
+        h1 { margin-bottom: 20px; font-size: 1.5rem; }
+
+        .controls {
+            background: var(--card-bg);
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        input {
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            font-size: 1rem;
+            width: 200px;
+        }
+
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            background-color: #339af0;
+            color: white;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: background 0.2s;
+        }
+        button:hover { background-color: #228be6; }
+        button.secondary { background-color: #adb5bd; }
+        button.secondary:hover { background-color: #868e96; }
+
+        /* Visualization Section */
+        .vis-container {
+            display: grid;
+            gap: 20px;
+            width: 100%;
+            max-width: 1400px;
+            grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+        }
+
+        .card {
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 25px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            border-bottom: 2px solid var(--border-color);
+            padding-bottom: 10px;
+        }
+        
+        .card-title { font-size: 1.2rem; font-weight: bold; }
+        .hex-display { font-family: monospace; color: #666; background: #eee; padding: 2px 6px; border-radius: 4px;}
+
+        /* Bit Grid */
+        .bit-grid {
+            display: grid;
+            gap: 2px;
+            margin-bottom: 10px;
+        }
+        
+        .bit-grid.bits-8 { grid-template-columns: repeat(8, 1fr); }
+        .bit-grid.bits-16 { grid-template-columns: repeat(16, 1fr); }
+        .bit-grid.bits-32 { grid-template-columns: repeat(32, 1fr); }
+        .bit-grid.bits-64 { grid-template-columns: repeat(32, 1fr); }
+
+        .bit-box {
+            aspect-ratio: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: monospace;
+            font-size: 0.8rem;
+            font-weight: bold;
+            color: white;
+            border-radius: 2px;
+            position: relative;
+            cursor: default;
+        }
+
+        /* Bit Markers (31, 23, 15, 7, 0) */
+        .bit-markers {
+            display: grid;
+            gap: 2px;
+            margin-bottom: 5px;
+            font-size: 0.6rem;
+            color: #999;
+            text-align: center;
+        }
+        .bit-markers.bits-8 { grid-template-columns: repeat(8, 1fr); }
+        .bit-markers.bits-16 { grid-template-columns: repeat(16, 1fr); }
+        .bit-markers.bits-32 { grid-template-columns: repeat(32, 1fr); }
+        .bit-markers.bits-64 { grid-template-columns: repeat(32, 1fr); }
+        
+        .marker { visibility: hidden; }
+        .marker.visible { visibility: visible; }
+
+        /* Colors */
+        .bit-sign { background-color: var(--sign-color); }
+        .bit-exp { background-color: var(--exp-color); }
+        .bit-mantissa { background-color: var(--mantissa-color); }
+        .bit-int { background-color: var(--int-color); }
+        .bit-int-sign { background-color: var(--sign-color); }
+        .bit-unsigned { background-color: var(--unsigned-color); }
+        .bit-double-exp { background-color: #20c997; }
+        .bit-double-mantissa { background-color: #339af0; }
+
+        /* Legend & Info */
+        .info-panel {
+            margin-top: 15px;
+            font-size: 0.9rem;
+            line-height: 1.6;
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+        }
+
+        .legend {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 10px;
+            font-size: 0.85rem;
+        }
+        .legend-item { display: flex; align-items: center; gap: 5px; }
+        .dot { width: 12px; height: 12px; border-radius: 50%; }
+
+        .formula {
+            font-family: monospace;
+            background: #fff;
+            padding: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            display: inline-block;
+            margin-top: 5px;
+        }
+
+        /* Responsive */
+        @media (max-width: 1200px) {
+            .vis-container { grid-template-columns: 1fr; }
+        }
+        @media (max-width: 800px) {
+            .bit-grid.bits-32, .bit-grid.bits-64 { grid-template-columns: repeat(16, 1fr); }
+            .bit-markers.bits-32, .bit-markers.bits-64 { grid-template-columns: repeat(16, 1fr); }
+        }
+    </style>
+</head>
+<body>
+
+    <h1>C语言数据类型内存可视化</h1>
+
+    <div class="controls">
+        <input type="number" id="numInput" placeholder="输入数字" value="10.5">
+        <button onclick="generateRandomFloat()">随机浮点数</button>
+        <button onclick="generateRandomInt()" class="secondary">随机整数</button>
+        <button onclick="generateRandomChar()" class="secondary">随机字符值</button>
+    </div>
+
+    <div class="vis-container">
+        
+        <!-- char (1 byte) -->
+        <div class="card">
+            <div class="card-header">
+                <span class="card-title">char (8-bit 有符号)</span>
+                <span class="hex-display" id="charHex">0x00</span>
+            </div>
+            <div class="legend">
+                <div class="legend-item"><div class="dot" style="background:var(--sign-color)"></div>符号位</div>
+                <div class="legend-item"><div class="dot" style="background:var(--int-color)"></div>数值位</div>
+            </div>
+            <div class="bit-markers bits-8" id="charMarkers"></div>
+            <div class="bit-grid bits-8" id="charGrid"></div>
+            <div class="info-panel" id="charInfo"></div>
+        </div>
+
+        <!-- unsigned char (1 byte) -->
+        <div class="card">
+            <div class="card-header">
+                <span class="card-title">unsigned char (8-bit 无符号)</span>
+                <span class="hex-display" id="ucharHex">0x00</span>
+            </div>
+            <div class="legend">
+                <div class="legend-item"><div class="dot" style="background:var(--unsigned-color)"></div>数值位 (全部)</div>
+            </div>
+            <div class="bit-markers bits-8" id="ucharMarkers"></div>
+            <div class="bit-grid bits-8" id="ucharGrid"></div>
+            <div class="info-panel" id="ucharInfo"></div>
+        </div>
+
+        <!-- short (2 bytes) -->
+        <div class="card">
+            <div class="card-header">
+                <span class="card-title">short (16-bit 有符号)</span>
+                <span class="hex-display" id="shortHex">0x0000</span>
+            </div>
+            <div class="legend">
+                <div class="legend-item"><div class="dot" style="background:var(--sign-color)"></div>符号位</div>
+                <div class="legend-item"><div class="dot" style="background:var(--int-color)"></div>数值位</div>
+            </div>
+            <div class="bit-markers bits-16" id="shortMarkers"></div>
+            <div class="bit-grid bits-16" id="shortGrid"></div>
+            <div class="info-panel" id="shortInfo"></div>
+        </div>
+
+        <!-- unsigned short (2 bytes) -->
+        <div class="card">
+            <div class="card-header">
+                <span class="card-title">unsigned short (16-bit 无符号)</span>
+                <span class="hex-display" id="ushortHex">0x0000</span>
+            </div>
+            <div class="legend">
+                <div class="legend-item"><div class="dot" style="background:var(--unsigned-color)"></div>数值位 (全部)</div>
+            </div>
+            <div class="bit-markers bits-16" id="ushortMarkers"></div>
+            <div class="bit-grid bits-16" id="ushortGrid"></div>
+            <div class="info-panel" id="ushortInfo"></div>
+        </div>
+
+        <!-- int (4 bytes) -->
+        <div class="card">
+            <div class="card-header">
+                <span class="card-title">int (32-bit 有符号)</span>
+                <span class="hex-display" id="intHex">0x00000000</span>
+            </div>
+            <div class="legend">
+                <div class="legend-item"><div class="dot" style="background:var(--sign-color)"></div>符号位</div>
+                <div class="legend-item"><div class="dot" style="background:var(--int-color)"></div>数值位 (补码)</div>
+            </div>
+            <div class="bit-markers bits-32" id="intMarkers"></div>
+            <div class="bit-grid bits-32" id="intGrid"></div>
+            <div class="info-panel" id="intInfo"></div>
+        </div>
+
+        <!-- unsigned int (4 bytes) -->
+        <div class="card">
+            <div class="card-header">
+                <span class="card-title">unsigned int (32-bit 无符号)</span>
+                <span class="hex-display" id="uintHex">0x00000000</span>
+            </div>
+            <div class="legend">
+                <div class="legend-item"><div class="dot" style="background:var(--unsigned-color)"></div>数值位 (全部)</div>
+            </div>
+            <div class="bit-markers bits-32" id="uintMarkers"></div>
+            <div class="bit-grid bits-32" id="uintGrid"></div>
+            <div class="info-panel" id="uintInfo"></div>
+        </div>
+
+        <!-- long (4 or 8 bytes, showing as 32-bit) -->
+        <div class="card">
+            <div class="card-header">
+                <span class="card-title">long (32-bit 有符号, 部分平台)</span>
+                <span class="hex-display" id="longHex">0x00000000</span>
+            </div>
+            <div class="legend">
+                <div class="legend-item"><div class="dot" style="background:var(--sign-color)"></div>符号位</div>
+                <div class="legend-item"><div class="dot" style="background:var(--int-color)"></div>数值位</div>
+            </div>
+            <div class="bit-markers bits-32" id="longMarkers"></div>
+            <div class="bit-grid bits-32" id="longGrid"></div>
+            <div class="info-panel" id="longInfo"></div>
+        </div>
+
+        <!-- unsigned long -->
+        <div class="card">
+            <div class="card-header">
+                <span class="card-title">unsigned long (32-bit 无符号, 部分平台)</span>
+                <span class="hex-display" id="ulongHex">0x00000000</span>
+            </div>
+            <div class="legend">
+                <div class="legend-item"><div class="dot" style="background:var(--unsigned-color)"></div>数值位 (全部)</div>
+            </div>
+            <div class="bit-markers bits-32" id="ulongMarkers"></div>
+            <div class="bit-grid bits-32" id="ulongGrid"></div>
+            <div class="info-panel" id="ulongInfo"></div>
+        </div>
+
+        <!-- IEEE 754 Float Section -->
+        <div class="card">
+            <div class="card-header">
+                <span class="card-title">float (IEEE 754 单精度 32-bit)</span>
+                <span class="hex-display" id="floatHex">0x00000000</span>
+            </div>
+            <div class="legend">
+                <div class="legend-item"><div class="dot" style="background:var(--sign-color)"></div>符号位 (1bit)</div>
+                <div class="legend-item"><div class="dot" style="background:var(--exp-color)"></div>指数位 (8bits)</div>
+                <div class="legend-item"><div class="dot" style="background:var(--mantissa-color)"></div>尾数位 (23bits)</div>
+            </div>
+            <div class="bit-markers bits-32" id="floatMarkers"></div>
+            <div class="bit-grid bits-32" id="floatGrid"></div>
+            <div class="info-panel" id="floatInfo"></div>
+        </div>
+
+        <!-- IEEE 754 Double Section (showing 64 bits in 2 rows) -->
+        <div class="card">
+            <div class="card-header">
+                <span class="card-title">double (IEEE 754 双精度 64-bit)</span>
+                <span class="hex-display" id="doubleHex">0x0000000000000000</span>
+            </div>
+            <div class="legend">
+                <div class="legend-item"><div class="dot" style="background:var(--sign-color)"></div>符号位 (1bit)</div>
+                <div class="legend-item"><div class="dot" style="background:#20c997"></div>指数位 (11bits)</div>
+                <div class="legend-item"><div class="dot" style="background:#339af0"></div>尾数位 (52bits)</div>
+            </div>
+            <div style="font-size:0.7rem; color:#999; margin-bottom:5px;">高32位:</div>
+            <div class="bit-markers bits-64" id="doubleMarkersHigh"></div>
+            <div class="bit-grid bits-64" id="doubleGridHigh"></div>
+            <div style="font-size:0.7rem; color:#999; margin:10px 0 5px;">低32位:</div>
+            <div class="bit-markers bits-64" id="doubleMarkersLow"></div>
+            <div class="bit-grid bits-64" id="doubleGridLow"></div>
+            <div class="info-panel" id="doubleInfo"></div>
+        </div>
+
+    </div>
+
+    <script>
+        const numInput = document.getElementById('numInput');
+        
+        // Initial Render
+        updateVisualization();
+
+        // Event Listener
+        numInput.addEventListener('input', updateVisualization);
+
+        function generateRandomFloat() {
+            const rand = (Math.random() * 2000) - 1000;
+            numInput.value = rand.toFixed(4);
+            updateVisualization();
+        }
+
+        function generateRandomInt() {
+            const min = -2147483648;
+            const max = 2147483647;
+            const rand = Math.floor(Math.random() * (max - min + 1)) + min;
+            numInput.value = rand;
+            updateVisualization();
+        }
+
+        function generateRandomChar() {
+            const rand = Math.floor(Math.random() * 256) - 128;
+            numInput.value = rand;
+            updateVisualization();
+        }
+
+        function updateVisualization() {
+            let val = parseFloat(numInput.value);
+            if (isNaN(val)) val = 0;
+
+            renderChar(val);
+            renderUChar(val);
+            renderShort(val);
+            renderUShort(val);
+            renderInt(val);
+            renderUInt(val);
+            renderLong(val);
+            renderULong(val);
+            renderFloat(val);
+            renderDouble(val);
+        }
+
+        // ============================
+        // Helper Functions
+        // ============================
+        function renderIntegerType(num, bits, id, signed) {
+            const intVal = Math.trunc(num);
+            let displayVal, binStr, hexStr, min, max;
+            
+            if (bits === 8) {
+                if (signed) {
+                    displayVal = ((intVal & 0xFF) << 24) >> 24; // Sign extend
+                    min = -128; max = 127;
+                } else {
+                    displayVal = intVal & 0xFF;
+                    min = 0; max = 255;
+                }
+                binStr = (intVal & 0xFF).toString(2).padStart(8, '0');
+                hexStr = "0x" + (intVal & 0xFF).toString(16).toUpperCase().padStart(2, '0');
+            } else if (bits === 16) {
+                if (signed) {
+                    displayVal = ((intVal & 0xFFFF) << 16) >> 16; // Sign extend
+                    min = -32768; max = 32767;
+                } else {
+                    displayVal = intVal & 0xFFFF;
+                    min = 0; max = 65535;
+                }
+                binStr = (intVal & 0xFFFF).toString(2).padStart(16, '0');
+                hexStr = "0x" + (intVal & 0xFFFF).toString(16).toUpperCase().padStart(4, '0');
+            } else { // 32 bits
+                if (signed) {
+                    displayVal = intVal | 0;
+                    min = -2147483648; max = 2147483647;
+                } else {
+                    displayVal = intVal >>> 0;
+                    min = 0; max = 4294967295;
+                }
+                binStr = (intVal >>> 0).toString(2).padStart(32, '0');
+                hexStr = "0x" + (intVal >>> 0).toString(16).toUpperCase().padStart(8, '0');
+            }
+
+            // Clamp value to range
+            displayVal = Math.max(min, Math.min(max, displayVal));
+            
+            document.getElementById(id + 'Hex').innerText = hexStr;
+            
+            const grid = document.getElementById(id + 'Grid');
+            grid.innerHTML = '';
+            
+            const markers = document.getElementById(id + 'Markers');
+            markers.innerHTML = generateMarkersHTML(bits);
+
+            // Render bits
+            if (signed) {
+                grid.appendChild(createBit(binStr[0], 'bit-int-sign', '符号位'));
+                for (let i = 1; i < bits; i++) {
+                    grid.appendChild(createBit(binStr[i], 'bit-int', '数值位'));
+                }
+            } else {
+                for (let i = 0; i < bits; i++) {
+                    grid.appendChild(createBit(binStr[i], 'bit-unsigned', '数值位'));
+                }
+            }
+
+            // Info
+            const info = document.getElementById(id + 'Info');
+            let desc = "";
+            if (num !== intVal) {
+                desc = `<div style="color:orange;">注意: 小数部分已截断</div>`;
+            }
+            if (displayVal !== intVal) {
+                desc += `<div style="color:red;">注意: 数值溢出，实际存储值为 ${displayVal}</div>`;
+            }
+            
+            info.innerHTML = `
+                ${desc}
+                <div><strong>十进制值:</strong> ${displayVal}</div>
+                <div><strong>范围:</strong> ${min.toLocaleString()} 到 ${max.toLocaleString()}</div>
+            `;
+        }
+
+        function renderChar(num) { renderIntegerType(num, 8, 'char', true); }
+        function renderUChar(num) { renderIntegerType(num, 8, 'uchar', false); }
+        function renderShort(num) { renderIntegerType(num, 16, 'short', true); }
+        function renderUShort(num) { renderIntegerType(num, 16, 'ushort', false); }
+        function renderInt(num) { renderIntegerType(num, 32, 'int', true); }
+        function renderUInt(num) { renderIntegerType(num, 32, 'uint', false); }
+        function renderLong(num) { renderIntegerType(num, 32, 'long', true); }
+        function renderULong(num) { renderIntegerType(num, 32, 'ulong', false); }
+
+        // ============================
+        // Float Logic (IEEE 754)
+        // ============================
+        function renderFloat(num) {
+            // Create a buffer to read the raw bits of the float
+            const buffer = new ArrayBuffer(4);
+            const view = new DataView(buffer);
+            view.setFloat32(0, num);
+            const uint = view.getUint32(0);
+            
+            // Get binary string padded to 32 bits
+            const binStr = uint.toString(2).padStart(32, '0');
+            const hexStr = "0x" + uint.toString(16).toUpperCase().padStart(8, '0');
+            
+            document.getElementById('floatHex').innerText = hexStr;
+
+            // Generate Bits UI
+            const grid = document.getElementById('floatGrid');
+            grid.innerHTML = '';
+            
+            // Markers
+            const markers = document.getElementById('floatMarkers');
+            markers.innerHTML = generateMarkersHTML();
+
+            // Parse Components
+            const signBit = binStr[0];
+            const expBits = binStr.substring(1, 9);
+            const mantissaBits = binStr.substring(9);
+
+            // Calculation Values
+            const S = signBit === '1' ? -1 : 1;
+            const E_raw = parseInt(expBits, 2);
+            const E_real = E_raw - 127; 
+            // Normalized: 1.xxxxx, Denormalized: 0.xxxxx
+            let M_val = 1; 
+            let mantissaVal = 0;
+            
+            // Calculate mantissa value (2^-1 + 2^-2 ...)
+            for(let i=0; i<mantissaBits.length; i++) {
+                if(mantissaBits[i] === '1') {
+                    mantissaVal += Math.pow(2, -(i+1));
+                }
+            }
+
+            let formulaText = "";
+            let explanation = "";
+
+            if (E_raw === 255) {
+                if (mantissaVal !== 0) explanation = "NaN (Not a Number)";
+                else explanation = S === -1 ? "-Infinity" : "+Infinity";
+            } else if (E_raw === 0) {
+                if (mantissaVal === 0) explanation = "Zero";
+                else {
+                    // Denormalized
+                    M_val = mantissaVal;
+                    formulaText = `(-1)<sup>${signBit}</sup> × ${M_val.toFixed(6)} × 2<sup>${1-127}</sup>`;
+                    explanation = "非规格化数 (Denormalized)";
+                }
+            } else {
+                // Normalized
+                M_val = 1 + mantissaVal;
+                formulaText = `(-1)<sup>${signBit}</sup> × ${M_val.toFixed(6)}... × 2<sup>${E_raw} - 127</sup>`;
+                explanation = `指数真实值: ${E_real}`;
+            }
+
+            // Render Bits
+            // Sign
+            grid.appendChild(createBit(signBit, 'bit-sign', '符号位'));
+            // Exponent
+            for (let b of expBits) grid.appendChild(createBit(b, 'bit-exp', '指数位'));
+            // Mantissa
+            for (let b of mantissaBits) grid.appendChild(createBit(b, 'bit-mantissa', '尾数位'));
+
+            // Render Info
+            const info = document.getElementById('floatInfo');
+            info.innerHTML = `
+                <div><strong>解析:</strong> ${explanation}</div>
+                ${formulaText ? `<div class="formula">${formulaText} = ${num}</div>` : ''}
+                <div style="margin-top:5px; font-size:0.8rem; color:#666;">
+                    S=${signBit}, E=${E_raw} (偏移量127), M=0x${parseInt(mantissaBits, 2).toString(16)}
+                </div>
+            `;
+        }
+
+        // ============================
+        // Double Logic (IEEE 754)
+        // ============================
+        function renderDouble(num) {
+            const buffer = new ArrayBuffer(8);
+            const view = new DataView(buffer);
+            view.setFloat64(0, num);
+            
+            // Get 64-bit as two 32-bit parts
+            const high = view.getUint32(0);
+            const low = view.getUint32(4);
+            
+            const binStrHigh = high.toString(2).padStart(32, '0');
+            const binStrLow = low.toString(2).padStart(32, '0');
+            const binStr = binStrHigh + binStrLow;
+            
+            const hexStr = "0x" + high.toString(16).toUpperCase().padStart(8, '0') + 
+                           low.toString(16).toUpperCase().padStart(8, '0');
+            
+            document.getElementById('doubleHex').innerText = hexStr;
+
+            // Parse Components
+            const signBit = binStr[0];
+            const expBits = binStr.substring(1, 12); // 11 bits
+            const mantissaBits = binStr.substring(12); // 52 bits
+
+            // Calculation Values
+            const S = signBit === '1' ? -1 : 1;
+            const E_raw = parseInt(expBits, 2);
+            const E_real = E_raw - 1023; 
+            
+            let mantissaVal = 0;
+            for(let i=0; i<mantissaBits.length; i++) {
+                if(mantissaBits[i] === '1') {
+                    mantissaVal += Math.pow(2, -(i+1));
+                }
+            }
+
+            let formulaText = "";
+            let explanation = "";
+
+            if (E_raw === 2047) {
+                if (mantissaVal !== 0) explanation = "NaN (Not a Number)";
+                else explanation = S === -1 ? "-Infinity" : "+Infinity";
+            } else if (E_raw === 0) {
+                if (mantissaVal === 0) explanation = "Zero";
+                else {
+                    const M_val = mantissaVal;
+                    formulaText = `(-1)<sup>${signBit}</sup> × ${M_val.toFixed(10)} × 2<sup>${1-1023}</sup>`;
+                    explanation = "非规格化数";
+                }
+            } else {
+                const M_val = 1 + mantissaVal;
+                formulaText = `(-1)<sup>${signBit}</sup> × ${M_val.toFixed(10)}... × 2<sup>${E_real}</sup>`;
+                explanation = `指数真实值: ${E_real}`;
+            }
+
+            // Render High 32 bits
+            const gridHigh = document.getElementById('doubleGridHigh');
+            gridHigh.innerHTML = '';
+            const markersHigh = document.getElementById('doubleMarkersHigh');
+            markersHigh.innerHTML = generateMarkersHTML(64, true);
+            
+            // Sign (1 bit)
+            gridHigh.appendChild(createBit(signBit, 'bit-sign', '符号位'));
+            // Exponent (11 bits, first 11 bits of expBits fill rest of high word)
+            for (let i = 0; i < 11; i++) {
+                gridHigh.appendChild(createBit(expBits[i], 'bit-double-exp', '指数位'));
+            }
+            // Mantissa (first 20 bits in high word)
+            for (let i = 0; i < 20; i++) {
+                gridHigh.appendChild(createBit(mantissaBits[i], 'bit-double-mantissa', '尾数位'));
+            }
+
+            // Render Low 32 bits (remaining 32 bits of mantissa)
+            const gridLow = document.getElementById('doubleGridLow');
+            gridLow.innerHTML = '';
+            const markersLow = document.getElementById('doubleMarkersLow');
+            markersLow.innerHTML = generateMarkersHTML(64, false);
+            
+            for (let i = 20; i < 52; i++) {
+                gridLow.appendChild(createBit(mantissaBits[i], 'bit-double-mantissa', '尾数位'));
+            }
+
+            const info = document.getElementById('doubleInfo');
+            info.innerHTML = `
+                <div><strong>解析:</strong> ${explanation}</div>
+                ${formulaText ? `<div class="formula">${formulaText} = ${num}</div>` : ''}
+                <div style="margin-top:5px; font-size:0.8rem; color:#666;">
+                    S=${signBit}, E=${E_raw} (偏移量1023), 尾数52位
+                </div>
+            `;
+        }
+
+        // Helper to create bit div
+        function createBit(val, className, tooltip) {
+            const div = document.createElement('div');
+            div.className = `bit-box ${className}`;
+            div.textContent = val;
+            div.title = tooltip;
+            return div;
+        }
+
+        // Helper for markers
+        function generateMarkersHTML(bits, isHigh) {
+            let html = '';
+            if (bits === 8) {
+                for (let i = 7; i >= 0; i--) {
+                    const visible = (i === 7 || i === 0 || i === 3) ? 'visible' : '';
+                    html += `<div class="marker ${visible}">${i}</div>`;
+                }
+            } else if (bits === 16) {
+                for (let i = 15; i >= 0; i--) {
+                    const visible = (i === 15 || i === 0 || i === 7 || (i+1)%8 === 0) ? 'visible' : '';
+                    html += `<div class="marker ${visible}">${i}</div>`;
+                }
+            } else if (bits === 64) {
+                // For 64-bit shown in 2 rows
+                if (isHigh) {
+                    for (let i = 63; i >= 32; i--) {
+                        const visible = (i === 63 || i === 32 || i === 52 || (i+1)%8 === 0) ? 'visible' : '';
+                        html += `<div class="marker ${visible}">${i}</div>`;
+                    }
+                } else {
+                    for (let i = 31; i >= 0; i--) {
+                        const visible = (i === 31 || i === 0 || (i+1)%8 === 0) ? 'visible' : '';
+                        html += `<div class="marker ${visible}">${i}</div>`;
+                    }
+                }
+            } else { // 32 bits
+                for (let i = 31; i >= 0; i--) {
+                    const visible = (i === 31 || i === 0 || i === 23 || (i+1)%8 === 0) ? 'visible' : '';
+                    html += `<div class="marker ${visible}">${i}</div>`;
+                }
+            }
+            return html;
+        }
+
+    </script>
+</body>
+</html>
