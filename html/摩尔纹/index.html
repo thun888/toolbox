@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>摩尔纹现象演示</title>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+            font-family: sans-serif;
+        }
+
+        .container {
+            position: relative;
+            width: 400px;
+            height: 400px;
+            background: white;
+            border: 2px solid #333;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+
+        /* 基础底层纹理 */
+        .layer {
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            /* 使用线性渐变创建细密条纹 */
+            background: repeating-linear-gradient(
+                90deg,
+                #000,
+                #000 1px,
+                transparent 1px,
+                transparent 4px
+            );
+        }
+
+        /* 可旋转的上层纹理 */
+        #top-layer {
+            opacity: 0.6; /* 设置半透明以便观察干涉 */
+            cursor: move;
+            transition: transform 0.1s linear;
+        }
+
+        .controls {
+            margin-top: 30px;
+            text-align: center;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+        }
+
+        input {
+            width: 300px;
+            cursor: pointer;
+        }
+
+        span {
+            font-weight: bold;
+            color: #ff4757;
+        }
+    </style>
+</head>
+<body>
+
+    <h2>摩尔纹（Moiré Pattern）实时演示</h2>
+    <p>拖动滑块旋转上层纹理，观察波纹的变化</p>
+
+    <div class="container">
+        <div class="layer"></div>
+        <div id="top-layer" class="layer"></div>
+    </div>
+
+    <div class="controls">
+        <label for="rotate">旋转角度: <span id="angle-val">0</span>°</label><br>
+        <input type="range" id="rotate" min="0" max="360" value="0">
+    </div>
+
+    <script>
+        const slider = document.getElementById('rotate');
+        const topLayer = document.getElementById('top-layer');
+        const angleVal = document.getElementById('angle-val');
+
+        slider.addEventListener('input', (e) => {
+            const angle = e.target.value;
+            topLayer.style.transform = `rotate(${angle}deg)`;
+            angleVal.textContent = angle;
+        });
+    </script>
+
+</body>
+</html>

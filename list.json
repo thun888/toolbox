@@ -21,7 +21,7 @@
         ]
     },
     {
-        "category": "学习工具",
+        "category": "可视化工具",
         "tools": [
             {
                 "title": "矩阵乘法动态演示",
@@ -32,6 +32,11 @@
                 "title": "可视化展示浮点数或整型",
                 "description": "可视化展示浮点数或整型在内存中二进制的存储状态",
                 "url": "html/可视化展示浮点数或整型/index.html"
+            },
+            {
+                "title": "摩尔纹",
+                "description": "摩尔纹效果的可视化展示",
+                "url": "html/摩尔纹/index.html"
             }
         ]
     },
