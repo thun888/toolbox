@@ -3,6 +3,11 @@
         "category": "开发工具",
         "tools": [
             {
+                "title": "文本差异比对",
+                "description": "基于 Myers/Histogram（可切换）的文本差异对比，输出最小变更集并排双栏视图。",
+                "url": "html/文本差异比对/index.html"
+            },
+            {
                 "title": "字符去重",
                 "description": "保持字符出现的顺序，只保留每个字符的第一次出现（支持中文、Emoji 等）。",
                 "url": "html/字符去重/index.html"
