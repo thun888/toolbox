@@ -1,0 +1,934 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>文本差异比对</title>
+  <link rel="stylesheet" href="https://static.hzchu.top/mdui@2/mdui.css">
+  <script src="https://static.hzchu.top/mdui@2/mdui.global.js"></script>
+  <link href="https://cfproxy.hzchu.top/https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  <link rel="icon" type="image/x-icon" href="/favicon.ico">
+  <style>
+    :root {
+      --bg-grad-a: #f3f0ff;
+      --bg-grad-b: #e7f3ff;
+      --bg-grad-c: #f3fff7;
+      --diff-add: #e6ffec;
+      --diff-del: #ffebe9;
+      --diff-eq: #ffffff;
+      --diff-mut: #fff8c5;
+      --diff-empty: #f6f8fa;
+      --line-num: var(--mdui-color-on-surface-variant);
+      --mono: "Cascadia Code", "JetBrains Mono", "Consolas", monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: radial-gradient(1200px 500px at 0% -10%, var(--bg-grad-a), transparent),
+                  radial-gradient(900px 500px at 100% 0%, var(--bg-grad-b), transparent),
+                  linear-gradient(135deg, var(--bg-grad-c), var(--mdui-color-surface));
+      color: var(--mdui-color-on-surface);
+    }
+
+    .container {
+      width: min(1320px, 96vw);
+      margin: 0 auto;
+      padding: 24px 0 28px;
+      display: grid;
+      gap: 16px;
+      animation: fade-up .38s ease-out;
+    }
+
+    .hero {
+      padding: 24px;
+      border-radius: 24px;
+      background: linear-gradient(140deg,
+        color-mix(in srgb, var(--mdui-color-primary-container) 80%, white 20%),
+        color-mix(in srgb, var(--mdui-color-tertiary-container) 76%, white 24%));
+      box-shadow: 0 10px 34px color-mix(in srgb, black 10%, transparent);
+    }
+
+    .hero h1 {
+      margin: 0;
+      font-size: clamp(1.45rem, 2.2vw, 2.2rem);
+      letter-spacing: .2px;
+    }
+
+    .hero p {
+      margin: 8px 0 0;
+      color: var(--mdui-color-on-secondary-container);
+    }
+
+    .controls-card,
+    .diff-card {
+      border-radius: 20px;
+      overflow: hidden;
+    }
+
+    .controls-wrap {
+      padding: 18px;
+      display: grid;
+      gap: 14px;
+    }
+
+    .algorithm-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 12px;
+      justify-content: space-between;
+    }
+
+    .algorithm-label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: .94rem;
+      color: var(--mdui-color-on-surface-variant);
+    }
+
+    .pane-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+
+    .pane {
+      display: grid;
+      gap: 8px;
+    }
+
+    .pane-title {
+      margin: 0;
+      font-size: .95rem;
+      color: var(--mdui-color-on-surface-variant);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .pane-title mdui-chip {
+      transform: scale(.9);
+      transform-origin: right center;
+    }
+
+    mdui-text-field {
+      width: 100%;
+    }
+
+    mdui-text-field::part(input) {
+      min-height: 220px;
+      max-height: 360px;
+      overflow-y: auto;
+      font-family: var(--mono);
+      font-size: .9rem;
+      line-height: 1.6;
+    }
+
+    .buttons-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(120px, 1fr));
+      gap: 10px;
+    }
+
+    .stat {
+      padding: 10px 12px;
+      border-radius: 12px;
+      background: var(--mdui-color-surface-container-high);
+    }
+
+    .stat .label {
+      font-size: .75rem;
+      color: var(--mdui-color-on-surface-variant);
+    }
+
+    .stat .value {
+      margin-top: 4px;
+      font-size: 1.02rem;
+      font-weight: 600;
+    }
+
+    .diff-wrap {
+      overflow: auto;
+      border-top: 1px solid color-mix(in srgb, var(--mdui-color-outline) 32%, transparent);
+      max-height: 64vh;
+      background: color-mix(in srgb, var(--mdui-color-surface-container) 55%, white 45%);
+    }
+
+    .diff-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      min-width: 860px;
+    }
+
+    .col {
+      border-right: 1px solid color-mix(in srgb, var(--mdui-color-outline) 22%, transparent);
+    }
+
+    .col:last-child {
+      border-right: 0;
+    }
+
+    .col-head {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      padding: 10px 12px;
+      font-size: .85rem;
+      color: var(--mdui-color-on-surface-variant);
+      background: color-mix(in srgb, var(--mdui-color-surface) 90%, white 10%);
+      border-bottom: 1px solid color-mix(in srgb, var(--mdui-color-outline) 28%, transparent);
+      backdrop-filter: blur(4px);
+    }
+
+    .line {
+      display: grid;
+      grid-template-columns: 52px 1fr;
+      align-items: stretch;
+      min-height: 28px;
+      border-bottom: 1px solid color-mix(in srgb, var(--mdui-color-outline) 12%, transparent);
+      font-family: var(--mono);
+      font-size: .86rem;
+      line-height: 1.55;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .line-num {
+      padding: 4px 8px;
+      text-align: right;
+      color: var(--line-num);
+      border-right: 1px solid color-mix(in srgb, var(--mdui-color-outline) 12%, transparent);
+      background: color-mix(in srgb, var(--mdui-color-surface-container) 82%, white 18%);
+      user-select: none;
+    }
+
+    .line-content {
+      padding: 4px 10px;
+    }
+
+    .char-del {
+      background: #ff818280;
+      text-decoration: line-through;
+      text-decoration-thickness: 1px;
+    }
+
+    .char-add {
+      background: #2da44e66;
+      border-bottom: 1px solid #1a7f37;
+    }
+
+    .add { background: var(--diff-add); }
+    .del { background: var(--diff-del); }
+    .eq  { background: var(--diff-eq); }
+    .empty { background: var(--diff-empty); }
+
+    .line.add .line-num { background: #ccffd8; }
+    .line.del .line-num { background: #ffd8d3; }
+    .line.empty .line-num { background: #eef1f4; }
+
+    .line.folded {
+      background: #f6f8fa;
+      color: #57606a;
+      font-style: italic;
+    }
+
+    .line.folded .line-content {
+      border-left: 3px solid #d0d7de;
+    }
+
+    .empty-state {
+      padding: 40px 16px;
+      text-align: center;
+      color: var(--mdui-color-on-surface-variant);
+    }
+
+    @keyframes fade-up {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @media (max-width: 980px) {
+      .pane-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .stats {
+        grid-template-columns: repeat(2, minmax(120px, 1fr));
+      }
+
+      .diff-wrap {
+        max-height: 58vh;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="container">
+    <!-- <section class="hero">
+      <h1>文本差异比对</h1>
+      <p>支持 Myers / Histogram 可切换，计算最小变更集并以并排双栏展示。</p>
+    </section> -->
+
+    <mdui-card variant="elevated" class="controls-card">
+      <div class="controls-wrap">
+        <div class="algorithm-row">
+          <div class="algorithm-label">
+            <mdui-icon name="tune"></mdui-icon>
+            算法
+          </div>
+          <div style="display:flex; align-items:center; gap: 12px; flex-wrap: wrap;">
+            <mdui-segmented-button-group id="algoSwitch" selects="single" value="myers">
+              <mdui-segmented-button value="myers" selected>Myers</mdui-segmented-button>
+              <mdui-segmented-button value="histogram">Histogram</mdui-segmented-button>
+            </mdui-segmented-button-group>
+            <mdui-checkbox id="collapseEqual">折叠不变行</mdui-checkbox>
+          </div>
+        </div>
+
+        <div class="pane-grid">
+          <div class="pane">
+            <p class="pane-title">
+              原文本
+              <mdui-button id="loadLeftFileBtn" variant="text" icon="upload_file">左侧 A</mdui-button>
+            </p>
+            <mdui-text-field id="leftText" rows="10" autosize placeholder="粘贴原文本"></mdui-text-field>
+          </div>
+          <div class="pane">
+            <p class="pane-title">
+              对比文本
+              <mdui-button id="loadRightFileBtn" variant="text" icon="upload_file">右侧 B</mdui-button>
+            </p>
+            <mdui-text-field id="rightText" rows="10" autosize placeholder="粘贴新文本"></mdui-text-field>
+          </div>
+        </div>
+
+        <input id="leftFileInput" type="file" accept="text/*,.txt,.md,.json,.log,.csv,.js,.ts,.html,.css,.py,.java,.xml,.yml,.yaml" hidden>
+        <input id="rightFileInput" type="file" accept="text/*,.txt,.md,.json,.log,.csv,.js,.ts,.html,.css,.py,.java,.xml,.yml,.yaml" hidden>
+
+        <div class="buttons-row">
+          <mdui-button id="runDiff" variant="filled" icon="compare_arrows">计算差异</mdui-button>
+          <mdui-button id="exportPatch" variant="elevated" icon="content_copy">导出 Patch</mdui-button>
+          <mdui-button id="swapText" variant="tonal" icon="swap_horiz">交换两侧</mdui-button>
+          <!-- <mdui-button id="demoData" variant="outlined" icon="auto_awesome">填充示例</mdui-button> -->
+          <mdui-button id="clearAll" variant="text" icon="delete">清空</mdui-button>
+        </div>
+
+        <div class="stats" id="stats">
+          <div class="stat"><div class="label">变更块</div><div class="value" id="statBlocks">0</div></div>
+          <div class="stat"><div class="label">新增行</div><div class="value" id="statAdds">0</div></div>
+          <div class="stat"><div class="label">删除行</div><div class="value" id="statDels">0</div></div>
+          <div class="stat"><div class="label">编辑距离</div><div class="value" id="statEdit">0</div></div>
+        </div>
+      </div>
+    </mdui-card>
+
+    <mdui-card variant="outlined" class="diff-card">
+      <div class="diff-wrap" id="diffWrap">
+        <div class="empty-state" id="emptyState">输入两段文本后点击“计算差异”</div>
+        <div class="diff-grid" id="diffGrid" style="display:none;">
+          <section class="col">
+            <div class="col-head">A（原文本）</div>
+            <div id="leftView"></div>
+          </section>
+          <section class="col">
+            <div class="col-head">B（对比文本）</div>
+            <div id="rightView"></div>
+          </section>
+        </div>
+      </div>
+    </mdui-card>
+  </main>
+
+  <script>
+    const { snackbar } = mdui;
+
+    const leftText = document.getElementById('leftText');
+    const rightText = document.getElementById('rightText');
+    const algoSwitch = document.getElementById('algoSwitch');
+
+    const leftView = document.getElementById('leftView');
+    const rightView = document.getElementById('rightView');
+    const diffGrid = document.getElementById('diffGrid');
+    const emptyState = document.getElementById('emptyState');
+
+    const statBlocks = document.getElementById('statBlocks');
+    const statAdds = document.getElementById('statAdds');
+    const statDels = document.getElementById('statDels');
+    const statEdit = document.getElementById('statEdit');
+    const collapseEqual = document.getElementById('collapseEqual');
+    let lastDiffState = null;
+
+    document.getElementById('runDiff').addEventListener('click', runDiff);
+    document.getElementById('exportPatch').addEventListener('click', exportPatch);
+    bindFilePicker('loadLeftFileBtn', 'leftFileInput', leftText, '左侧 A');
+    bindFilePicker('loadRightFileBtn', 'rightFileInput', rightText, '右侧 B');
+    document.getElementById('swapText').addEventListener('click', () => {
+      const tmp = leftText.value;
+      leftText.value = rightText.value;
+      rightText.value = tmp;
+      runDiff();
+    });
+    document.getElementById('clearAll').addEventListener('click', () => {
+      leftText.value = '';
+      rightText.value = '';
+      renderEmpty();
+    });
+    // document.getElementById('demoData').addEventListener('click', fillDemo);
+    collapseEqual.addEventListener('change', () => {
+      if (!lastDiffState) return;
+      const rows = alignRows(lastDiffState.groups);
+      renderRows(rows);
+    });
+
+    function bindFilePicker(buttonId, inputId, targetField, sideLabel) {
+      const btn = document.getElementById(buttonId);
+      const picker = document.getElementById(inputId);
+
+      btn.addEventListener('click', () => picker.click());
+
+      picker.addEventListener('change', async (event) => {
+        const file = event.target.files && event.target.files[0];
+        if (!file) return;
+
+        try {
+          const text = await file.text();
+          targetField.value = text;
+          snackbar({ message: sideLabel + ' 已导入：' + file.name, placement: 'top' });
+          if (leftText.value || rightText.value) {
+            runDiff();
+          }
+        } catch (error) {
+          console.error('读取文件失败:', error);
+          snackbar({ message: '读取文件失败，请确认文件编码或格式', placement: 'top' });
+        } finally {
+          picker.value = '';
+        }
+      });
+    }
+
+    function fillDemo() {
+      leftText.value = [
+        'function hello(name) {',
+        '  const greeting = "Hello, " + name;',
+        '  return greeting;',
+        '}',
+        '',
+        'console.log(hello("World"));'
+      ].join('\n');
+
+      rightText.value = [
+        'function hello(name, lang = "en") {',
+        '  const greeting = lang === "zh" ? "你好，" + name : "Hello, " + name;',
+        '  return greeting.trim();',
+        '}',
+        '',
+        'console.info(hello("World", "zh"));'
+      ].join('\n');
+
+      runDiff();
+    }
+
+    function normalizeText(text) {
+      return text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+    }
+
+    function toLines(text) {
+      if (!text) return [];
+      return normalizeText(text).split('\n');
+    }
+
+    function runDiff() {
+      const a = toLines(leftText.value);
+      const b = toLines(rightText.value);
+
+      if (a.length === 0 && b.length === 0) {
+        renderEmpty('输入两段文本后点击“计算差异”');
+        return;
+      }
+
+      const mode = (algoSwitch.value || 'myers').toLowerCase();
+      let groups = mode === 'histogram' ? histogramDiff(a, b) : myersDiff(a, b);
+
+      // 最小变更集兜底：Histogram 结果若更差，则回退到 Myers。
+      if (mode === 'histogram') {
+        const myers = myersDiff(a, b);
+        if (editDistance(groups) > editDistance(myers)) {
+          groups = myers;
+        }
+      }
+
+      const rows = alignRows(groups);
+      renderRows(rows);
+      updateStats(groups);
+      lastDiffState = { a, b, groups };
+    }
+
+    function renderEmpty(message = '暂无差异') {
+      leftView.innerHTML = '';
+      rightView.innerHTML = '';
+      diffGrid.style.display = 'none';
+      emptyState.style.display = 'block';
+      emptyState.textContent = message;
+      statBlocks.textContent = '0';
+      statAdds.textContent = '0';
+      statDels.textContent = '0';
+      statEdit.textContent = '0';
+      lastDiffState = null;
+    }
+
+    function renderRows(rows) {
+      if (!rows.length) {
+        renderEmpty('两段文本完全一致');
+        return;
+      }
+
+      diffGrid.style.display = 'grid';
+      emptyState.style.display = 'none';
+
+      const leftHtml = [];
+      const rightHtml = [];
+      const viewRows = collapseEqual.checked ? collapseUnchangedRows(rows) : rows;
+
+      for (const row of viewRows) {
+        leftHtml.push(lineHtml(row.leftNum, row.leftText, row.leftClass, row.leftRaw || false));
+        rightHtml.push(lineHtml(row.rightNum, row.rightText, row.rightClass, row.rightRaw || false));
+      }
+
+      leftView.innerHTML = leftHtml.join('');
+      rightView.innerHTML = rightHtml.join('');
+    }
+
+    function lineHtml(num, text, cls, raw = false) {
+      return '<div class="line ' + cls + '">' +
+        '<div class="line-num">' + (num === null ? '' : num) + '</div>' +
+        '<div class="line-content">' + (raw ? text : escapeHtml(text)) + '</div>' +
+      '</div>';
+    }
+
+    function collapseUnchangedRows(rows, context = 2, minFoldRun = 7) {
+      const out = [];
+      let i = 0;
+
+      while (i < rows.length) {
+        if (rows[i].leftClass !== 'eq' || rows[i].rightClass !== 'eq') {
+          out.push(rows[i]);
+          i += 1;
+          continue;
+        }
+
+        let j = i;
+        while (j < rows.length && rows[j].leftClass === 'eq' && rows[j].rightClass === 'eq') {
+          j += 1;
+        }
+
+        const runLen = j - i;
+        if (runLen < minFoldRun) {
+          for (let k = i; k < j; k++) out.push(rows[k]);
+          i = j;
+          continue;
+        }
+
+        for (let k = i; k < i + context; k++) out.push(rows[k]);
+
+        const foldedCount = runLen - context * 2;
+        out.push({
+          leftNum: null,
+          rightNum: null,
+          leftText: '... 已折叠 ' + foldedCount + ' 行不变内容 ...',
+          rightText: '... 已折叠 ' + foldedCount + ' 行不变内容 ...',
+          leftClass: 'folded',
+          rightClass: 'folded'
+        });
+
+        for (let k = j - context; k < j; k++) out.push(rows[k]);
+        i = j;
+      }
+
+      return out;
+    }
+
+    function escapeHtml(s) {
+      return String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function updateStats(groups) {
+      let blocks = 0;
+      let adds = 0;
+      let dels = 0;
+      for (const g of groups) {
+        if (g.type !== 'equal') blocks += 1;
+        if (g.type === 'insert') adds += g.lines.length;
+        if (g.type === 'delete') dels += g.lines.length;
+      }
+
+      statBlocks.textContent = String(blocks);
+      statAdds.textContent = String(adds);
+      statDels.textContent = String(dels);
+      statEdit.textContent = String(adds + dels);
+    }
+
+    function editDistance(groups) {
+      let d = 0;
+      for (const g of groups) {
+        if (g.type === 'insert' || g.type === 'delete') d += g.lines.length;
+      }
+      return d;
+    }
+
+    function alignRows(groups) {
+      const rows = [];
+      let leftNum = 1;
+      let rightNum = 1;
+
+      for (let i = 0; i < groups.length; i++) {
+        const g = groups[i];
+
+        if (g.type === 'equal') {
+          for (const line of g.lines) {
+            rows.push({
+              leftNum,
+              rightNum,
+              leftText: line,
+              rightText: line,
+              leftClass: 'eq',
+              rightClass: 'eq'
+            });
+            leftNum += 1;
+            rightNum += 1;
+          }
+          continue;
+        }
+
+        if (g.type === 'delete' && i + 1 < groups.length && groups[i + 1].type === 'insert') {
+          const next = groups[i + 1];
+          const maxLen = Math.max(g.lines.length, next.lines.length);
+          for (let k = 0; k < maxLen; k++) {
+            const leftLine = g.lines[k] ?? '';
+            const rightLine = next.lines[k] ?? '';
+            const hasLeft = k < g.lines.length;
+            const hasRight = k < next.lines.length;
+            const inline = hasLeft && hasRight ? inlineCharDiff(leftLine, rightLine) : null;
+            rows.push({
+              leftNum: hasLeft ? leftNum++ : null,
+              rightNum: hasRight ? rightNum++ : null,
+              leftText: hasLeft ? (inline ? inline.left : leftLine) : '',
+              rightText: hasRight ? (inline ? inline.right : rightLine) : '',
+              leftClass: hasLeft ? 'del' : 'empty',
+              rightClass: hasRight ? 'add' : 'empty',
+              leftRaw: Boolean(inline),
+              rightRaw: Boolean(inline)
+            });
+          }
+          i += 1;
+          continue;
+        }
+
+        if (g.type === 'delete') {
+          for (const line of g.lines) {
+            rows.push({
+              leftNum,
+              rightNum: null,
+              leftText: line,
+              rightText: '',
+              leftClass: 'del',
+              rightClass: 'empty'
+            });
+            leftNum += 1;
+          }
+          continue;
+        }
+
+        if (g.type === 'insert') {
+          for (const line of g.lines) {
+            rows.push({
+              leftNum: null,
+              rightNum,
+              leftText: '',
+              rightText: line,
+              leftClass: 'empty',
+              rightClass: 'add'
+            });
+            rightNum += 1;
+          }
+        }
+      }
+
+      return rows;
+    }
+
+    function inlineCharDiff(leftLine, rightLine) {
+      const a = Array.from(leftLine);
+      const b = Array.from(rightLine);
+      const groups = myersDiff(a, b);
+
+      let leftHtml = '';
+      let rightHtml = '';
+
+      for (const g of groups) {
+        const text = g.lines.map((ch) => escapeHtml(ch)).join('');
+        if (g.type === 'equal') {
+          leftHtml += text;
+          rightHtml += text;
+        } else if (g.type === 'delete') {
+          leftHtml += '<span class="char-del">' + text + '</span>';
+        } else if (g.type === 'insert') {
+          rightHtml += '<span class="char-add">' + text + '</span>';
+        }
+      }
+
+      return { left: leftHtml, right: rightHtml };
+    }
+
+    function exportPatch() {
+      if (!lastDiffState) {
+        snackbar({ message: '请先计算差异', placement: 'top' });
+        return;
+      }
+
+      const patch = buildUnifiedPatch(lastDiffState.a, lastDiffState.b, lastDiffState.groups);
+      copyText(patch)
+        .then(() => snackbar({ message: 'Patch 已复制到剪贴板', placement: 'top' }))
+        .catch(() => snackbar({ message: '复制失败，请检查浏览器权限', placement: 'top' }));
+    }
+
+    async function copyText(text) {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(text);
+        return;
+      }
+
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      const ok = document.execCommand('copy');
+      document.body.removeChild(ta);
+      if (!ok) {
+        throw new Error('copy failed');
+      }
+    }
+
+    function buildUnifiedPatch(a, b, groups) {
+      const out = [];
+      out.push('--- a/input.txt');
+      out.push('+++ b/input.txt');
+      out.push('@@ -1,' + a.length + ' +1,' + b.length + ' @@');
+
+      for (const g of groups) {
+        if (g.type === 'equal') {
+          for (const line of g.lines) out.push(' ' + line);
+        }
+        if (g.type === 'delete') {
+          for (const line of g.lines) out.push('-' + line);
+        }
+        if (g.type === 'insert') {
+          for (const line of g.lines) out.push('+' + line);
+        }
+      }
+
+      return out.join('\n') + '\n';
+    }
+
+    function myersDiff(a, b) {
+      const n = a.length;
+      const m = b.length;
+      const max = n + m;
+      const offset = max;
+      const v = new Array(2 * max + 1).fill(0);
+      const trace = [];
+
+      for (let d = 0; d <= max; d++) {
+        trace.push(v.slice());
+        for (let k = -d; k <= d; k += 2) {
+          let x;
+          if (k === -d || (k !== d && v[offset + k - 1] < v[offset + k + 1])) {
+            x = v[offset + k + 1];
+          } else {
+            x = v[offset + k - 1] + 1;
+          }
+
+          let y = x - k;
+          while (x < n && y < m && a[x] === b[y]) {
+            x += 1;
+            y += 1;
+          }
+          v[offset + k] = x;
+
+          if (x >= n && y >= m) {
+            return buildGroupsFromTrace(trace, a, b, d, offset);
+          }
+        }
+      }
+
+      return [];
+    }
+
+    function buildGroupsFromTrace(trace, a, b, dMax, offset) {
+      let x = a.length;
+      let y = b.length;
+      const atomic = [];
+
+      for (let d = dMax; d >= 0; d--) {
+        const v = trace[d];
+        const k = x - y;
+
+        let prevK;
+        if (k === -d || (k !== d && v[offset + k - 1] < v[offset + k + 1])) {
+          prevK = k + 1;
+        } else {
+          prevK = k - 1;
+        }
+
+        const prevX = v[offset + prevK];
+        const prevY = prevX - prevK;
+
+        while (x > prevX && y > prevY) {
+          atomic.push({ type: 'equal', line: a[x - 1] });
+          x -= 1;
+          y -= 1;
+        }
+
+        if (d === 0) break;
+
+        if (x === prevX) {
+          atomic.push({ type: 'insert', line: b[y - 1] });
+          y -= 1;
+        } else {
+          atomic.push({ type: 'delete', line: a[x - 1] });
+          x -= 1;
+        }
+      }
+
+      atomic.reverse();
+      return compactAtomic(atomic);
+    }
+
+    function compactAtomic(atomic) {
+      const groups = [];
+      for (const it of atomic) {
+        const last = groups[groups.length - 1];
+        if (last && last.type === it.type) {
+          last.lines.push(it.line);
+        } else {
+          groups.push({ type: it.type, lines: [it.line] });
+        }
+      }
+      return groups;
+    }
+
+    function histogramDiff(a, b) {
+      const atomic = histogramAtomic(a, 0, a.length, b, 0, b.length);
+      return compactAtomic(atomic);
+    }
+
+    function histogramAtomic(a, a0, a1, b, b0, b1) {
+      if (a0 >= a1 && b0 >= b1) return [];
+      if (a0 >= a1) {
+        return b.slice(b0, b1).map((line) => ({ type: 'insert', line }));
+      }
+      if (b0 >= b1) {
+        return a.slice(a0, a1).map((line) => ({ type: 'delete', line }));
+      }
+
+      const anchor = findHistogramAnchor(a, a0, a1, b, b0, b1);
+      if (!anchor) {
+        const sub = myersDiff(a.slice(a0, a1), b.slice(b0, b1));
+        return expandGroups(sub);
+      }
+
+      const out = [];
+      out.push(...histogramAtomic(a, a0, anchor.ai, b, b0, anchor.bi));
+      for (let i = 0; i < anchor.run; i++) {
+        out.push({ type: 'equal', line: a[anchor.ai + i] });
+      }
+      out.push(...histogramAtomic(a, anchor.ai + anchor.run, a1, b, anchor.bi + anchor.run, b1));
+      return out;
+    }
+
+    function expandGroups(groups) {
+      const atomic = [];
+      for (const g of groups) {
+        for (const line of g.lines) {
+          atomic.push({ type: g.type, line });
+        }
+      }
+      return atomic;
+    }
+
+    function findHistogramAnchor(a, a0, a1, b, b0, b1) {
+      const posB = new Map();
+      const freqA = new Map();
+
+      for (let i = a0; i < a1; i++) {
+        const s = a[i];
+        freqA.set(s, (freqA.get(s) || 0) + 1);
+      }
+
+      for (let j = b0; j < b1; j++) {
+        const s = b[j];
+        if (!posB.has(s)) posB.set(s, []);
+        posB.get(s).push(j);
+      }
+
+      let best = null;
+      let bestScore = Number.POSITIVE_INFINITY;
+
+      for (let i = a0; i < a1; i++) {
+        const s = a[i];
+        const js = posB.get(s);
+        if (!js) continue;
+
+        const aCount = freqA.get(s) || 0;
+        const bCount = js.length;
+
+        // 高频行可能是噪声，避免被选为锚点。
+        if (aCount > 64 || bCount > 64) continue;
+
+        for (const j of js) {
+          let run = 0;
+          while (i + run < a1 && j + run < b1 && a[i + run] === b[j + run]) {
+            run += 1;
+          }
+
+          if (run === 0) continue;
+
+          const freqScore = (aCount + bCount) * 1000;
+          const runScore = -run * 20;
+          const distanceScore = Math.abs((i - a0) - (j - b0));
+          const score = freqScore + runScore + distanceScore;
+
+          if (score < bestScore) {
+            bestScore = score;
+            best = { ai: i, bi: j, run };
+          }
+        }
+      }
+
+      return best;
+    }
+
+    fillDemo();
+  </script>
+</body>
+</html>
