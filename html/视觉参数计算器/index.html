@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>视觉参数计算器</title>
+  <!-- <link href="https://cfproxy.hzchu.top/https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700;800&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet"> -->
+  <link rel="icon" type="image/x-icon" href="/favicon.ico">
+  <style>
+    :root {
+      --bg-1: #f8fafc;
+      --bg-2: #eefdf8;
+      --bg-3: #fff8ef;
+      --text: #0f172a;
+      --text-soft: #4b5563;
+      --line: #d7dee7;
+      --card: rgba(255, 255, 255, 0.9);
+      --accent: #0f766e;
+      --accent-soft: #d1fae5;
+      --btn: #0f766e;
+      --btn-hover: #0b5f59;
+      --mono: "Space Grotesk", "Consolas", monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Noto Sans SC", sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(1000px 420px at 0% -10%, #dcfce7, transparent),
+        radial-gradient(900px 460px at 100% 0%, #e0f2fe, transparent),
+        linear-gradient(120deg, var(--bg-3), var(--bg-1) 45%, var(--bg-2));
+    }
+
+    .grid-bg {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      opacity: 0.16;
+      background-image:
+        linear-gradient(#9ca3af22 1px, transparent 1px),
+        linear-gradient(90deg, #9ca3af22 1px, transparent 1px);
+      background-size: 30px 30px;
+      z-index: 0;
+    }
+
+    .container {
+      position: relative;
+      z-index: 1;
+      width: min(1100px, 94vw);
+      margin: 0 auto;
+      padding: 24px 0 34px;
+      display: grid;
+      gap: 14px;
+    }
+
+    .page-title {
+      margin: 0;
+      font-size: clamp(1.3rem, 2vw, 1.9rem);
+      font-family: "Space Grotesk", "Noto Sans SC", sans-serif;
+      letter-spacing: .2px;
+      color: #052e2b;
+    }
+
+    .page-subtitle {
+      margin: 4px 0 0;
+      color: var(--text-soft);
+      font-size: .93rem;
+      line-height: 1.7;
+    }
+
+    .panel {
+      border: 1px solid #ffffff;
+      border-radius: 18px;
+      background: var(--card);
+      box-shadow: 0 10px 30px rgba(2, 8, 23, 0.08);
+      backdrop-filter: blur(8px);
+      padding: 16px;
+      display: grid;
+      gap: 14px;
+    }
+
+    .panel-soft {
+      background: linear-gradient(130deg, #ffffffcc, #f0f9ffcc);
+    }
+
+    .panel-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .panel-head h2 {
+      margin: 0;
+      font-size: 1.08rem;
+      color: #0f172a;
+    }
+
+    .tag {
+      font-size: .76rem;
+      padding: 4px 10px;
+      border: 1px solid #99f6e4;
+      border-radius: 999px;
+      color: #0f766e;
+      background: #ecfeff;
+    }
+
+    .tag-btn {
+      cursor: pointer;
+      font-weight: 600;
+      transition: background-color .2s ease, border-color .2s ease;
+    }
+
+    .tag-btn:hover {
+      background: #d1fae5;
+      border-color: #5eead4;
+    }
+
+    .table-wrap {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      overflow: hidden;
+      background: #fffdf5;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: .9rem;
+    }
+
+    th,
+    td {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+    }
+
+    th {
+      font-size: .79rem;
+      text-transform: uppercase;
+      letter-spacing: .25px;
+      background: #fef3c7;
+      color: #334155;
+    }
+
+    tr:last-child td {
+      border-bottom: 0;
+    }
+
+    .form-grid {
+      display: grid;
+      gap: 12px;
+      grid-template-columns: repeat(12, minmax(0, 1fr));
+      align-items: end;
+    }
+
+    .form-grid > * {
+      min-width: 0;
+    }
+
+    .col-3 { grid-column: span 3; }
+    .col-4 { grid-column: span 4; }
+    .col-5 { grid-column: span 5; }
+    .col-6 { grid-column: span 6; }
+
+    .field {
+      display: grid;
+      gap: 6px;
+    }
+
+    .field label {
+      font-size: .82rem;
+      color: var(--text-soft);
+    }
+
+    input,
+    select,
+    button {
+      font: inherit;
+    }
+
+    .field input,
+    .field select {
+      width: 100%;
+      height: 42px;
+      border-radius: 10px;
+      border: 1px solid #cbd5e1;
+      background: #ffffff;
+      color: #0f172a;
+      padding: 0 12px;
+      outline: none;
+      transition: border-color .2s ease, box-shadow .2s ease;
+    }
+
+    .field input:focus,
+    .field select:focus {
+      border-color: #0f766e;
+      box-shadow: 0 0 0 3px #99f6e466;
+    }
+
+    .unit-input {
+      display: flex;
+      align-items: stretch;
+      height: 42px;
+      border-radius: 10px;
+      border: 1px solid #cbd5e1;
+      background: #fff;
+      overflow: hidden;
+      transition: border-color .2s ease, box-shadow .2s ease;
+    }
+
+    .unit-input:focus-within {
+      border-color: #0f766e;
+      box-shadow: 0 0 0 3px #99f6e466;
+    }
+
+    .unit-input input {
+      flex: 1;
+      width: 100%;
+      border: 0;
+      height: 100%;
+      padding: 0 12px;
+      min-width: 0;
+      border-radius: 0;
+      box-shadow: none;
+    }
+
+    .unit-input select {
+      width: 108px;
+      flex: 0 0 auto;
+      border: 0;
+      border-left: 1px solid #cbd5e1;
+      border-radius: 0;
+      height: 100%;
+      padding: 0 8px;
+      background: #f8fafc;
+      box-shadow: none;
+    }
+
+    .actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      height: 40px;
+      padding: 0 14px;
+      border: 0;
+      border-radius: 10px;
+      cursor: pointer;
+      font-weight: 600;
+      color: #fff;
+      background: var(--btn);
+      transition: transform .15s ease, background-color .2s ease;
+    }
+
+    .btn:hover {
+      background: var(--btn-hover);
+      transform: translateY(-1px);
+    }
+
+    .btn.secondary {
+      background: #475569;
+    }
+
+    .btn.secondary:hover {
+      background: #334155;
+    }
+
+    .auto-swap-flag {
+      min-height: 20px;
+      font-size: .82rem;
+      color: #0f766e;
+    }
+
+    .result-grid {
+      display: grid;
+      gap: 10px;
+      grid-template-columns: repeat(4, minmax(120px, 1fr));
+    }
+
+    .result-grid.two {
+      grid-template-columns: repeat(2, minmax(150px, 1fr));
+    }
+
+    .metric {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 10px 12px;
+      background: #f8fafc;
+    }
+
+    .metric-label {
+      font-size: .75rem;
+      color: #64748b;
+      letter-spacing: .2px;
+    }
+
+    .metric-value {
+      margin-top: 6px;
+      font-family: var(--mono);
+      font-size: .98rem;
+      font-weight: 700;
+      color: #0f172a;
+      word-break: break-word;
+    }
+
+    .hint {
+      margin: 0;
+      font-size: .88rem;
+      color: var(--text-soft);
+      line-height: 1.6;
+    }
+
+    .formula {
+      border: 1px dashed #94a3b8;
+      border-radius: 12px;
+      padding: 12px;
+      background: #eff6ff;
+      color: #0f172a;
+      font-family: var(--mono);
+      font-size: .86rem;
+      line-height: 1.55;
+    }
+
+    .foot {
+      margin: 0;
+      font-size: .82rem;
+      color: #64748b;
+      line-height: 1.6;
+    }
+
+    .toast {
+      position: fixed;
+      left: 50%;
+      bottom: 20px;
+      transform: translateX(-50%) translateY(12px);
+      background: #0f172a;
+      color: #fff;
+      padding: 10px 14px;
+      border-radius: 10px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .2s ease, transform .2s ease;
+      z-index: 30;
+      font-size: .88rem;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    @media (max-width: 980px) {
+      .col-3,
+      .col-4,
+      .col-5,
+      .col-6 {
+        grid-column: span 12;
+      }
+
+      .result-grid {
+        grid-template-columns: repeat(2, minmax(130px, 1fr));
+      }
+    }
+
+    @media (max-width: 560px) {
+      .container {
+        width: min(1100px, 96vw);
+      }
+
+      .panel {
+        padding: 14px;
+      }
+
+      .result-grid,
+      .result-grid.two {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="grid-bg"></div>
+  <main class="container">
+    <!-- <header>
+      <h1 class="page-title">视觉参数计算器</h1>
+      <p class="page-subtitle">相机靶面尺寸换算 + 镜头分辨率对应像元尺寸估算</p>
+    </header> -->
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2>相机靶面计算</h2>
+        <button id="toggleSpecTable" class="tag tag-btn" type="button" aria-expanded="false" aria-controls="specTableWrap">展开规格对照表</button>
+      </div>
+
+      <div id="specTableWrap" class="table-wrap" hidden>
+        <table>
+          <thead>
+            <tr>
+              <th>常见规格</th>
+              <th>约对应对角线</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>1 英寸</td><td>约 16 mm</td></tr>
+            <tr><td>2/3 英寸</td><td>约 11 mm</td></tr>
+            <tr><td>1/2 英寸</td><td>约 8 mm</td></tr>
+            <tr><td>1/3 英寸</td><td>约 6 mm</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="form-grid">
+        <div class="field col-3">
+          <label for="resLong">传感器分辨率长度（px）</label>
+          <input id="resLong" type="number" min="1" value="3000">
+        </div>
+        <div class="field col-3">
+          <label for="resShort">传感器分辨率宽度（px）</label>
+          <input id="resShort" type="number" min="1" value="2000">
+        </div>
+        <div class="field col-6">
+          <label for="pixelSize">像元尺寸</label>
+          <div class="unit-input">
+            <input id="pixelSize" type="number" min="0" step="any" value="2.5">
+            <select id="pixelUnit" aria-label="像元尺寸单位">
+              <option value="um" selected>微米 (um)</option>
+              <option value="mm">毫米 (mm)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button id="calcSensor" class="btn" type="button">计算靶面</button>
+        <button id="resetSensor" class="btn secondary" type="button">重置</button>
+        <span class="auto-swap-flag" id="swapHint"></span>
+      </div>
+
+      <div class="result-grid">
+        <div class="metric">
+          <div class="metric-label">传感器物理长宽</div>
+          <div class="metric-value" id="outSize">-</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">对角线长度</div>
+          <div class="metric-value" id="outDiagonal">-</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">规格系数（对角线 / 16）</div>
+          <div class="metric-value" id="outSpec">-</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">接近常见规格</div>
+          <div class="metric-value" id="outNearest">-</div>
+        </div>
+      </div>
+
+      <div class="formula" id="sensorFormula">等待输入参数...</div>
+    </section>
+
+    <section class="panel panel-soft">
+      <div class="panel-head">
+        <h2>镜头分辨率相关计算</h2>
+      </div>
+
+      <p class="hint">输入像方分辨率（lp/mm），计算搭配相机的最小像元尺寸</p>
+
+      <div class="form-grid">
+        <div class="field col-6">
+          <label for="lpmm">像方分辨率（lp/mm）</label>
+          <input id="lpmm" type="number" min="0" step="any" value="120">
+        </div>
+        <div class="actions col-6" style="justify-content: flex-start;">
+          <button id="calcLens" class="btn" type="button">计算像元</button>
+        </div>
+      </div>
+
+      <div class="result-grid two">
+        <div class="metric">
+          <div class="metric-label">最小像元尺寸（um）</div>
+          <div class="metric-value" id="outLensUm">-</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">对应 mm 值</div>
+          <div class="metric-value" id="outLensMm">-</div>
+        </div>
+      </div>
+
+      <div class="formula" id="lensFormula">等待输入参数...</div>
+    </section>
+
+    <p class="foot">说明：这里的“规格”按对角线除以 16 mm 换算，属于工程估算常用口径，不等同于实际感光面积标准命名。</p>
+  </main>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    const resLongField = document.getElementById('resLong');
+    const resShortField = document.getElementById('resShort');
+    const pixelSizeField = document.getElementById('pixelSize');
+    const pixelUnitSelect = document.getElementById('pixelUnit');
+    const swapHint = document.getElementById('swapHint');
+    const toggleSpecTableBtn = document.getElementById('toggleSpecTable');
+    const specTableWrap = document.getElementById('specTableWrap');
+
+    const outSize = document.getElementById('outSize');
+    const outDiagonal = document.getElementById('outDiagonal');
+    const outSpec = document.getElementById('outSpec');
+    const outNearest = document.getElementById('outNearest');
+    const sensorFormula = document.getElementById('sensorFormula');
+
+    const lpmmField = document.getElementById('lpmm');
+    const outLensUm = document.getElementById('outLensUm');
+    const outLensMm = document.getElementById('outLensMm');
+    const lensFormula = document.getElementById('lensFormula');
+
+    const toast = document.getElementById('toast');
+    let toastTimer = null;
+
+    const commonSpecs = [
+      { label: '1 英寸', diagonalMm: 16 },
+      { label: '2/3 英寸', diagonalMm: 11 },
+      { label: '1/2 英寸', diagonalMm: 8 },
+      { label: '1/3 英寸', diagonalMm: 6 }
+    ];
+
+    function showToast(message) {
+      toast.textContent = message;
+      toast.classList.add('show');
+      window.clearTimeout(toastTimer);
+      toastTimer = window.setTimeout(() => {
+        toast.classList.remove('show');
+      }, 1800);
+    }
+
+    function parsePositive(value) {
+      const num = Number(value);
+      if (!Number.isFinite(num) || num <= 0) {
+        return null;
+      }
+      return num;
+    }
+
+    function toggleSpecTable() {
+      specTableWrap.hidden = !specTableWrap.hidden;
+      const expanded = !specTableWrap.hidden;
+      toggleSpecTableBtn.setAttribute('aria-expanded', String(expanded));
+      toggleSpecTableBtn.textContent = expanded ? '收起规格对照表' : '展开规格对照表';
+    }
+
+    function toPixelPitchMm(value, unit) {
+      return unit === 'mm' ? value : value / 1000;
+    }
+
+    function formatSpec(spec) {
+      if (spec < 1) {
+        return '约 1/' + (1 / spec).toFixed(2) + ' 英寸型';
+      }
+      return spec.toFixed(2) + ' 英寸型';
+    }
+
+    function findNearestSpec(diagonalMm) {
+      let best = commonSpecs[0];
+      let bestDiff = Math.abs(diagonalMm - best.diagonalMm);
+
+      for (let i = 1; i < commonSpecs.length; i += 1) {
+        const item = commonSpecs[i];
+        const diff = Math.abs(diagonalMm - item.diagonalMm);
+        if (diff < bestDiff) {
+          best = item;
+          bestDiff = diff;
+        }
+      }
+
+      return best.label + '（差值 ' + bestDiff.toFixed(3) + ' mm）';
+    }
+
+    function normalizeResolution() {
+      let longPx = parsePositive(resLongField.value);
+      let shortPx = parsePositive(resShortField.value);
+
+      if (!longPx || !shortPx) {
+        swapHint.textContent = '';
+        return null;
+      }
+
+      if (shortPx > longPx) {
+        const temp = longPx;
+        longPx = shortPx;
+        shortPx = temp;
+
+        resLongField.value = String(longPx);
+        resShortField.value = String(shortPx);
+        swapHint.textContent = '检测到宽度大于长度，已自动对调。';
+      } else {
+        swapHint.textContent = '';
+      }
+
+      return { longPx, shortPx };
+    }
+
+    function calculateSensor() {
+      const resolution = normalizeResolution();
+      const pixelSize = parsePositive(pixelSizeField.value);
+      const pixelUnit = pixelUnitSelect.value || 'um';
+
+      if (!resolution || !pixelSize) {
+        showToast('请填写有效的分辨率与像元尺寸');
+        return;
+      }
+
+      const pixelPitchMm = toPixelPitchMm(pixelSize, pixelUnit);
+      const sensorLongMm = resolution.longPx * pixelPitchMm;
+      const sensorShortMm = resolution.shortPx * pixelPitchMm;
+      const diagonalMm = Math.hypot(sensorLongMm, sensorShortMm);
+      const specFactor = diagonalMm / 16;
+
+      outSize.textContent = sensorLongMm.toFixed(3) + ' mm × ' + sensorShortMm.toFixed(3) + ' mm';
+      outDiagonal.textContent = diagonalMm.toFixed(3) + ' mm';
+      outSpec.textContent = specFactor.toFixed(4) + '（' + formatSpec(specFactor) + '）';
+      outNearest.textContent = findNearestSpec(diagonalMm);
+
+      sensorFormula.innerHTML =
+        '传感器长边 = ' + resolution.longPx + ' × ' + pixelPitchMm.toFixed(6) + ' = ' + sensorLongMm.toFixed(3) + ' mm<br>' +
+        '传感器短边 = ' + resolution.shortPx + ' × ' + pixelPitchMm.toFixed(6) + ' = ' + sensorShortMm.toFixed(3) + ' mm<br>' +
+        '对角线 = sqrt(' + sensorLongMm.toFixed(3) + '^2 + ' + sensorShortMm.toFixed(3) + '^2) = ' + diagonalMm.toFixed(3) + ' mm<br>' +
+        '规格系数 = ' + diagonalMm.toFixed(3) + ' / 16 = ' + specFactor.toFixed(4);
+    }
+
+    function calculateLens() {
+      const lpmm = parsePositive(lpmmField.value);
+
+      if (!lpmm) {
+        showToast('请输入有效的 lp/mm 数值');
+        return;
+      }
+
+      const minPixelMm = 1 / (2 * lpmm);
+      const minPixelUm = minPixelMm * 1000;
+
+      outLensUm.textContent = minPixelUm.toFixed(3) + ' um';
+      outLensMm.textContent = minPixelMm.toFixed(6) + ' mm';
+
+      lensFormula.innerHTML =
+        '最小像元尺寸 = 1 / (2 × ' + lpmm.toFixed(3) + ')<br>' +
+        '= ' + minPixelMm.toFixed(6) + ' mm<br>' +
+        '= ' + minPixelUm.toFixed(3) + ' um';
+    }
+
+    function resetSensor() {
+      resLongField.value = '3000';
+      resShortField.value = '2000';
+      pixelSizeField.value = '2.5';
+      pixelUnitSelect.value = 'um';
+      swapHint.textContent = '';
+      calculateSensor();
+    }
+
+    document.getElementById('calcSensor').addEventListener('click', calculateSensor);
+    document.getElementById('resetSensor').addEventListener('click', resetSensor);
+    document.getElementById('calcLens').addEventListener('click', calculateLens);
+    toggleSpecTableBtn.addEventListener('click', toggleSpecTable);
+
+    [resLongField, resShortField, pixelSizeField, pixelUnitSelect].forEach((field) => {
+      field.addEventListener('change', calculateSensor);
+      field.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') {
+          calculateSensor();
+        }
+      });
+    });
+
+    lpmmField.addEventListener('change', calculateLens);
+    lpmmField.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        calculateLens();
+      }
+    });
+
+    calculateSensor();
+    calculateLens();
+  </script>
+</body>
+</html>
