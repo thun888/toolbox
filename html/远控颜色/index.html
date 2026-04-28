@@ -1,0 +1,1148 @@
+\<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>远控颜色</title>
+    <link rel="stylesheet" href="https://static.hzchu.top/mdui@2/mdui.css">
+    <script src="https://static.hzchu.top/mdui@2/mdui.global.js"></script>
+    <!-- <link href="https://cfproxy.hzchu.top/https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet"> -->
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <script src="https://static.hzchu.top/peerjs@1.5.4/dist/peerjs.min.js"></script>
+    <script src="https://static.hzchu.top/qrcode/build/qrcode.min.js"></script>
+    <style>
+        :root {
+            --bg-a: #fcf3e6;
+            --bg-b: #e9f7ff;
+            --bg-c: #f5fff3;
+            --panel: rgba(255, 255, 255, 0.78);
+            --text-main: #1f2937;
+            --text-soft: #4b5563;
+            --line: rgba(15, 23, 42, 0.12);
+            --accent: #ea580c;
+            --accent-soft: #ffedd5;
+            --success: #047857;
+            --danger: #b91c1c;
+            --mono: "JetBrains Mono", "Consolas", monospace;
+            --ui: "Noto Sans SC", "Microsoft YaHei", sans-serif;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: var(--ui);
+            color: var(--text-main);
+            background:
+                radial-gradient(1200px 700px at 5% -15%, var(--bg-a), transparent),
+                radial-gradient(1000px 580px at 95% 0%, var(--bg-b), transparent),
+                linear-gradient(130deg, var(--bg-c), #fffaf2);
+            overflow-x: hidden;
+        }
+
+        .bg-orb {
+            position: fixed;
+            border-radius: 999px;
+            filter: blur(40px);
+            opacity: 0.55;
+            pointer-events: none;
+            z-index: -1;
+            animation: drift 18s ease-in-out infinite alternate;
+        }
+
+        .orb-a {
+            width: 260px;
+            height: 260px;
+            top: 12vh;
+            left: -60px;
+            background: #f97316;
+        }
+
+        .orb-b {
+            width: 320px;
+            height: 320px;
+            right: -100px;
+            top: 34vh;
+            background: #0ea5e9;
+            animation-duration: 24s;
+        }
+
+        @keyframes drift {
+            from {
+                transform: translateY(-12px) translateX(0px);
+            }
+            to {
+                transform: translateY(16px) translateX(12px);
+            }
+        }
+
+        .app {
+            width: min(980px, 94vw);
+            margin: 0 auto;
+            padding: 30px 0 34px;
+            display: grid;
+            gap: 14px;
+            animation: reveal 0.36s ease-out;
+        }
+
+        @keyframes reveal {
+            from {
+                transform: translateY(8px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .hero {
+            backdrop-filter: blur(14px);
+            background: linear-gradient(135deg, rgba(255, 243, 227, 0.9), rgba(231, 247, 255, 0.84));
+            border: 1px solid var(--line);
+            border-radius: 26px;
+            padding: 22px;
+            box-shadow: 0 10px 34px rgba(15, 23, 42, 0.08);
+        }
+
+        .hero h1 {
+            margin: 0;
+            font-size: clamp(1.45rem, 2.7vw, 2.15rem);
+            letter-spacing: 0.2px;
+        }
+
+        .hero p {
+            margin: 8px 0 0;
+            color: var(--text-soft);
+            line-height: 1.7;
+        }
+
+        .panel {
+            background: var(--panel);
+            border: 1px solid var(--line);
+            backdrop-filter: blur(10px);
+            border-radius: 24px;
+            padding: 20px;
+            box-shadow: 0 8px 24px rgba(15, 23, 42, 0.05);
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .mode-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 14px;
+        }
+
+        .mode-btn {
+            border: 1px solid rgba(15, 23, 42, 0.18);
+            border-radius: 18px;
+            padding: 20px;
+            text-align: left;
+            background: linear-gradient(140deg, rgba(255, 255, 255, 0.8), rgba(252, 252, 252, 0.54));
+            cursor: pointer;
+            transition: transform 0.15s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+            color: var(--text-main);
+            font-family: inherit;
+        }
+
+        .mode-btn:hover {
+            transform: translateY(-2px);
+            border-color: rgba(234, 88, 12, 0.38);
+            box-shadow: 0 8px 18px rgba(15, 23, 42, 0.1);
+        }
+
+        .mode-btn h3 {
+            margin: 0;
+            font-size: 1.12rem;
+        }
+
+        .mode-btn p {
+            margin: 8px 0 0;
+            color: var(--text-soft);
+            line-height: 1.65;
+            font-size: 0.94rem;
+        }
+
+        .panel-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 16px;
+        }
+
+        .eyebrow {
+            margin: 0;
+            font-size: 0.82rem;
+            text-transform: uppercase;
+            letter-spacing: 0.9px;
+            color: var(--text-soft);
+        }
+
+        .panel-head h2 {
+            margin: 6px 0 0;
+            font-size: 1.35rem;
+        }
+
+        .status-pill {
+            padding: 6px 10px;
+            border-radius: 999px;
+            font-size: 0.82rem;
+            border: 1px solid transparent;
+            white-space: nowrap;
+        }
+
+        .status-neutral {
+            color: #334155;
+            background: #f1f5f9;
+            border-color: #cbd5e1;
+        }
+
+        .status-success {
+            color: #065f46;
+            background: #d1fae5;
+            border-color: #6ee7b7;
+        }
+
+        .status-error {
+            color: #7f1d1d;
+            background: #fee2e2;
+            border-color: #fca5a5;
+        }
+
+        .field-grid {
+            display: grid;
+            gap: 12px;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+        }
+
+        .field {
+            display: grid;
+            gap: 6px;
+        }
+
+        .field label {
+            font-size: 0.82rem;
+            color: var(--text-soft);
+            letter-spacing: 0.3px;
+        }
+
+        .field input[type="number"] {
+            width: 100%;
+            border: 1px solid rgba(15, 23, 42, 0.18);
+            border-radius: 12px;
+            padding: 10px;
+            font: inherit;
+            background: rgba(255, 255, 255, 0.8);
+        }
+
+        .field input[type="color"] {
+            width: 100%;
+            height: 44px;
+            border: 1px solid rgba(15, 23, 42, 0.18);
+            border-radius: 12px;
+            padding: 4px;
+            background: rgba(255, 255, 255, 0.78);
+            cursor: pointer;
+        }
+
+        .brightness-row {
+            margin-top: 14px;
+            display: grid;
+            gap: 8px;
+        }
+
+        .brightness-title {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.9rem;
+            color: var(--text-soft);
+        }
+
+        .brightness-row input[type="range"] {
+            width: 100%;
+            accent-color: var(--accent);
+            cursor: pointer;
+        }
+
+        .preview-card {
+            margin-top: 16px;
+            border: 1px solid rgba(15, 23, 42, 0.12);
+            border-radius: 16px;
+            overflow: hidden;
+            background: rgba(255, 255, 255, 0.8);
+        }
+
+        .swatch {
+            height: 150px;
+            background: rgb(255, 128, 64);
+            transition: background-color 0.12s linear;
+        }
+
+        .preview-text {
+            padding: 12px 14px;
+            font-family: var(--mono);
+            font-size: 0.9rem;
+            color: #0f172a;
+            border-top: 1px solid rgba(15, 23, 42, 0.08);
+        }
+
+        .actions {
+            margin-top: 16px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            border: 0;
+            border-radius: 12px;
+            padding: 10px 14px;
+            font: inherit;
+            cursor: pointer;
+            transition: transform 0.12s ease, box-shadow 0.2s ease;
+        }
+
+        .btn:active {
+            transform: translateY(1px);
+        }
+
+        .btn-primary {
+            background: linear-gradient(130deg, #ea580c, #f97316);
+            color: #fff;
+            box-shadow: 0 8px 16px rgba(249, 115, 22, 0.3);
+        }
+
+        .btn-secondary {
+            background: #f8fafc;
+            color: #1f2937;
+            border: 1px solid #cbd5e1;
+        }
+
+        .small-note {
+            margin: 12px 0 0;
+            color: var(--text-soft);
+            font-size: 0.9rem;
+            line-height: 1.65;
+        }
+
+        .peer-block {
+            border: 1px solid rgba(15, 23, 42, 0.14);
+            border-radius: 14px;
+            padding: 12px;
+            background: rgba(255, 255, 255, 0.82);
+        }
+
+        .peer-id-row,
+        .share-row {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .peer-id,
+        .share-url {
+            font-family: var(--mono);
+            font-size: 0.88rem;
+            color: #0f172a;
+            word-break: break-all;
+            background: #f8fafc;
+            border: 1px solid #cbd5e1;
+            border-radius: 10px;
+            padding: 8px 10px;
+            flex: 1;
+        }
+
+        .share-url {
+            text-decoration: none;
+        }
+
+        .share-url:hover {
+            text-decoration: underline;
+        }
+
+        .qr-wrap {
+            margin-top: 14px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 14px;
+            border: 1px dashed rgba(15, 23, 42, 0.24);
+            border-radius: 16px;
+            background: rgba(255, 255, 255, 0.68);
+            min-height: 250px;
+        }
+
+        .hint-bar {
+            border: 1px solid #fed7aa;
+            background: #fff7ed;
+            border-radius: 14px;
+            padding: 10px 12px;
+            color: #9a3412;
+            font-size: 0.92rem;
+        }
+
+        .fullscreen-stage {
+            position: fixed;
+            inset: 0;
+            display: none;
+            align-items: flex-end;
+            justify-content: center;
+            z-index: 9999;
+            color: #f8fafc;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .fullscreen-stage.visible {
+            display: flex;
+        }
+
+        .stage-tip {
+            margin-bottom: 32px;
+            padding: 10px 12px;
+            background: rgba(2, 6, 23, 0.48);
+            border-radius: 999px;
+            font-size: 0.9rem;
+            backdrop-filter: blur(8px);
+            font-family: var(--mono);
+        }
+
+        @media (max-width: 860px) {
+            .mode-grid,
+            .field-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .swatch {
+                height: 120px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="bg-orb orb-a"></div>
+    <div class="bg-orb orb-b"></div>
+
+    <main class="app">
+        <header class="hero">
+            <h1>远控颜色</h1>
+            <p>同一页面支持本地调色与远程主从控制。可输入 RGB、色盘选色、调亮度，并在确定后全屏显示颜色。</p>
+        </header>
+
+        <section id="autoMasterHint" class="hint-bar hidden">
+            检测到链接参数，已自动进入远控模式的主控端并尝试连接从控端。
+        </section>
+
+        <section id="modePicker" class="panel mode-grid">
+            <button class="mode-btn" id="btnModeLocal" type="button">
+                <h3>本地模式</h3>
+                <p>在当前设备调整 RGB 与亮度，点击“确定并全屏”后展示颜色，再点击画面退出。</p>
+            </button>
+            <button class="mode-btn" id="btnModeSlave" type="button">
+                <h3>远控模式（从控端）</h3>
+                <p>生成 Peer ID 与二维码，另一台设备扫码后会自动进入主控端并连接到你。</p>
+            </button>
+        </section>
+
+        <section id="controllerPanel" class="panel hidden">
+            <div class="panel-head">
+                <div>
+                    <p class="eyebrow" id="controllerRole">本地模式</p>
+                    <h2>颜色控制台</h2>
+                </div>
+                <span class="status-pill status-neutral" id="controllerNetStatus">未连接</span>
+            </div>
+
+            <div class="field-grid">
+                <div class="field">
+                    <label for="inputR">R 通道 (0-255)</label>
+                    <input id="inputR" type="number" min="0" max="255" value="255">
+                </div>
+                <div class="field">
+                    <label for="inputG">G 通道 (0-255)</label>
+                    <input id="inputG" type="number" min="0" max="255" value="128">
+                </div>
+                <div class="field">
+                    <label for="inputB">B 通道 (0-255)</label>
+                    <input id="inputB" type="number" min="0" max="255" value="64">
+                </div>
+                <div class="field">
+                    <label for="inputHex">色盘</label>
+                    <input id="inputHex" type="color" value="#ff8040">
+                </div>
+            </div>
+
+            <div class="brightness-row">
+                <div class="brightness-title">
+                    <span>亮度</span>
+                    <span id="brightnessValue">100%</span>
+                </div>
+                <input id="inputBrightness" type="range" min="0" max="200" value="100">
+            </div>
+
+            <div class="preview-card">
+                <div class="swatch" id="previewSwatch"></div>
+                <div class="preview-text" id="previewText">RGB(255, 128, 64)</div>
+            </div>
+
+            <div class="actions">
+                <button class="btn btn-primary" id="btnApply" type="button">确定并全屏</button>
+                <button class="btn btn-secondary" id="btnBackFromController" type="button">返回模式选择</button>
+            </div>
+
+            <p class="small-note" id="controllerHint">本地模式无需网络连接。点击“确定并全屏”后，点击画面即可退出。</p>
+        </section>
+
+        <section id="receiverPanel" class="panel hidden">
+            <div class="panel-head">
+                <div>
+                    <p class="eyebrow">远控模式 · 从控端</p>
+                    <h2>等待主控连接</h2>
+                </div>
+                <span class="status-pill status-neutral" id="slaveStatus">初始化中</span>
+            </div>
+
+            <div class="peer-block">
+                <p style="margin: 0 0 8px; color: var(--text-soft);">从控 Peer ID</p>
+                <div class="peer-id-row">
+                    <div class="peer-id" id="slavePeerId">生成中...</div>
+                    <button class="btn btn-secondary" id="btnCopyPeer" type="button">复制 ID</button>
+                </div>
+            </div>
+
+            <div class="qr-wrap">
+                <canvas id="qrCanvas" width="240" height="240"></canvas>
+            </div>
+
+            <div class="peer-block" style="margin-top: 14px;">
+                <p style="margin: 0 0 8px; color: var(--text-soft);">扫码访问链接</p>
+                <div class="share-row">
+                    <a class="share-url" id="shareUrl" href="#" target="_blank" rel="noopener noreferrer">链接生成后显示在此</a>
+                    <button class="btn btn-secondary" id="btnCopyLink" type="button">复制链接</button>
+                </div>
+            </div>
+
+            <div class="preview-card" style="margin-top: 14px;">
+                <div class="swatch" id="receiverColorSwatch"></div>
+                <div class="preview-text" id="receiverColorText">等待主控端推送颜色...</div>
+            </div>
+
+            <div class="actions">
+                <button class="btn btn-secondary" id="btnRestartSlave" type="button">重新生成二维码</button>
+                <button class="btn btn-secondary" id="btnBackFromReceiver" type="button">返回模式选择</button>
+            </div>
+
+            <p class="small-note">另一台设备扫码后会打开同一页面并携带 peer 参数，自动作为主控端连接当前从控端。</p>
+        </section>
+    </main>
+
+    <div id="fullscreenStage" class="fullscreen-stage">
+        <div class="stage-tip" id="fullscreenText">点击任意位置退出</div>
+    </div>
+
+    <script>
+        const state = {
+            mode: null,
+            base: { r: 255, g: 128, b: 64 },
+            brightness: 100,
+            peer: null,
+            conn: null,
+            targetPeerId: '',
+            sendTimer: null
+        };
+
+        const els = {
+            autoMasterHint: document.getElementById('autoMasterHint'),
+            modePicker: document.getElementById('modePicker'),
+            controllerPanel: document.getElementById('controllerPanel'),
+            receiverPanel: document.getElementById('receiverPanel'),
+            controllerRole: document.getElementById('controllerRole'),
+            controllerNetStatus: document.getElementById('controllerNetStatus'),
+            controllerHint: document.getElementById('controllerHint'),
+            inputR: document.getElementById('inputR'),
+            inputG: document.getElementById('inputG'),
+            inputB: document.getElementById('inputB'),
+            inputHex: document.getElementById('inputHex'),
+            inputBrightness: document.getElementById('inputBrightness'),
+            brightnessValue: document.getElementById('brightnessValue'),
+            previewSwatch: document.getElementById('previewSwatch'),
+            previewText: document.getElementById('previewText'),
+            btnApply: document.getElementById('btnApply'),
+            btnBackFromController: document.getElementById('btnBackFromController'),
+            btnModeLocal: document.getElementById('btnModeLocal'),
+            btnModeSlave: document.getElementById('btnModeSlave'),
+            slaveStatus: document.getElementById('slaveStatus'),
+            slavePeerId: document.getElementById('slavePeerId'),
+            btnCopyPeer: document.getElementById('btnCopyPeer'),
+            qrCanvas: document.getElementById('qrCanvas'),
+            shareUrl: document.getElementById('shareUrl'),
+            btnCopyLink: document.getElementById('btnCopyLink'),
+            receiverColorSwatch: document.getElementById('receiverColorSwatch'),
+            receiverColorText: document.getElementById('receiverColorText'),
+            btnRestartSlave: document.getElementById('btnRestartSlave'),
+            btnBackFromReceiver: document.getElementById('btnBackFromReceiver'),
+            fullscreenStage: document.getElementById('fullscreenStage'),
+            fullscreenText: document.getElementById('fullscreenText')
+        };
+
+        function showToast(message) {
+            if (window.mdui && typeof mdui.snackbar === 'function') {
+                mdui.snackbar({ message, placement: 'top' });
+                return;
+            }
+            console.log(message);
+        }
+
+        function clampChannel(value) {
+            if (!Number.isFinite(value)) {
+                return 0;
+            }
+            return Math.max(0, Math.min(255, Math.round(value)));
+        }
+
+        function clampBrightness(value) {
+            if (!Number.isFinite(value)) {
+                return 100;
+            }
+            return Math.max(0, Math.min(200, Math.round(value)));
+        }
+
+        function toHex(n) {
+            return n.toString(16).padStart(2, '0');
+        }
+
+        function rgbToHex(rgb) {
+            return `#${toHex(rgb.r)}${toHex(rgb.g)}${toHex(rgb.b)}`;
+        }
+
+        function hexToRgb(hex) {
+            const raw = hex.replace('#', '');
+            if (raw.length !== 6) {
+                return { r: 0, g: 0, b: 0 };
+            }
+            return {
+                r: parseInt(raw.slice(0, 2), 16),
+                g: parseInt(raw.slice(2, 4), 16),
+                b: parseInt(raw.slice(4, 6), 16)
+            };
+        }
+
+        function getAdjustedColor(base, brightness) {
+            const factor = brightness / 100;
+            return {
+                r: clampChannel(base.r * factor),
+                g: clampChannel(base.g * factor),
+                b: clampChannel(base.b * factor)
+            };
+        }
+
+        function rgbText(rgb) {
+            return `RGB(${rgb.r}, ${rgb.g}, ${rgb.b})`;
+        }
+
+        function setStatusPill(el, text, type) {
+            el.textContent = text;
+            el.classList.remove('status-neutral', 'status-success', 'status-error');
+            if (type === 'success') {
+                el.classList.add('status-success');
+            } else if (type === 'error') {
+                el.classList.add('status-error');
+            } else {
+                el.classList.add('status-neutral');
+            }
+        }
+
+        function syncInputsFromState() {
+            els.inputR.value = String(state.base.r);
+            els.inputG.value = String(state.base.g);
+            els.inputB.value = String(state.base.b);
+            els.inputHex.value = rgbToHex(state.base);
+            els.inputBrightness.value = String(state.brightness);
+            els.brightnessValue.textContent = `${state.brightness}%`;
+        }
+
+        function updateControllerPreview() {
+            syncInputsFromState();
+            const adjusted = getAdjustedColor(state.base, state.brightness);
+            els.previewSwatch.style.backgroundColor = `rgb(${adjusted.r}, ${adjusted.g}, ${adjusted.b})`;
+            els.previewText.textContent = `基础 ${rgbText(state.base)} | 亮度 ${state.brightness}% | 输出 ${rgbText(adjusted)}`;
+            if (isColorStageVisible()) {
+                paintColorStage(adjusted);
+            }
+        }
+
+        function updateReceiverPreview(adjusted, base, brightness) {
+            els.receiverColorSwatch.style.backgroundColor = `rgb(${adjusted.r}, ${adjusted.g}, ${adjusted.b})`;
+            els.receiverColorText.textContent = `收到颜色: ${rgbText(adjusted)} | 基础 ${rgbText(base)} | 亮度 ${brightness}%`;
+            if (isColorStageVisible()) {
+                paintColorStage(adjusted);
+            }
+        }
+
+        function isColorStageVisible() {
+            return els.fullscreenStage.classList.contains('visible') || !!document.fullscreenElement;
+        }
+
+        function paintColorStage(color) {
+            els.fullscreenStage.style.backgroundColor = `rgb(${color.r}, ${color.g}, ${color.b})`;
+            els.fullscreenText.textContent = `${rgbText(color)} · 点击任意位置退出`;
+        }
+
+        function showColorStage(color, preferFullscreen) {
+            paintColorStage(color);
+            els.fullscreenStage.classList.add('visible');
+            if (preferFullscreen && !document.fullscreenElement && els.fullscreenStage.requestFullscreen) {
+                els.fullscreenStage.requestFullscreen().catch(() => {
+                    // 远程触发时浏览器可能阻止全屏，这里保持铺满视图的显示方式。
+                });
+            }
+        }
+
+        function hideColorStage() {
+            if (document.fullscreenElement && document.exitFullscreen) {
+                document.exitFullscreen().catch(() => {});
+            }
+            els.fullscreenStage.classList.remove('visible');
+        }
+
+        function toggleColorStage() {
+            if (isColorStageVisible()) {
+                hideColorStage();
+                return;
+            }
+            const adjusted = getAdjustedColor(state.base, state.brightness);
+            showColorStage(adjusted, true);
+        }
+
+        function setPanelsVisibility({ picker, controller, receiver }) {
+            els.modePicker.classList.toggle('hidden', !picker);
+            els.controllerPanel.classList.toggle('hidden', !controller);
+            els.receiverPanel.classList.toggle('hidden', !receiver);
+        }
+
+        function clearQueryPeerParam() {
+            if (!window.location.search) {
+                return;
+            }
+            window.history.replaceState({}, '', window.location.pathname);
+        }
+
+        function destroyPeerResources() {
+            if (state.sendTimer) {
+                window.clearTimeout(state.sendTimer);
+                state.sendTimer = null;
+            }
+            if (state.conn) {
+                try {
+                    state.conn.close();
+                } catch (error) {
+                    console.warn('关闭连接失败:', error);
+                }
+                state.conn = null;
+            }
+            if (state.peer) {
+                try {
+                    state.peer.destroy();
+                } catch (error) {
+                    console.warn('销毁 Peer 失败:', error);
+                }
+                state.peer = null;
+            }
+        }
+
+        function enterModePicker() {
+            state.mode = null;
+            state.targetPeerId = '';
+            destroyPeerResources();
+            hideColorStage();
+            setPanelsVisibility({ picker: true, controller: false, receiver: false });
+            setStatusPill(els.controllerNetStatus, '未连接', 'neutral');
+            setStatusPill(els.slaveStatus, '未启动', 'neutral');
+            els.autoMasterHint.classList.add('hidden');
+            clearQueryPeerParam();
+        }
+
+        function enterLocalMode() {
+            destroyPeerResources();
+            state.mode = 'local';
+            setPanelsVisibility({ picker: false, controller: true, receiver: false });
+            els.controllerRole.textContent = '本地模式';
+            els.controllerHint.textContent = '本地模式无需网络连接。点击“确定并全屏”后，点击画面即可退出。';
+            els.btnApply.textContent = '确定并全屏';
+            setStatusPill(els.controllerNetStatus, '本地模式', 'neutral');
+            updateControllerPreview();
+        }
+
+        function enterSlaveMode() {
+            destroyPeerResources();
+            state.mode = 'remote-slave';
+            setPanelsVisibility({ picker: false, controller: false, receiver: true });
+            setStatusPill(els.slaveStatus, '正在创建 Peer', 'neutral');
+            els.slavePeerId.textContent = '生成中...';
+            els.shareUrl.textContent = '链接生成后显示在此';
+            els.shareUrl.href = '#';
+            startSlavePeer();
+        }
+
+        function enterMasterMode(targetPeerId, fromUrl = false) {
+            destroyPeerResources();
+            state.mode = 'remote-master';
+            state.targetPeerId = targetPeerId;
+            setPanelsVisibility({ picker: false, controller: true, receiver: false });
+            els.controllerRole.textContent = '远控模式 · 主控端';
+            els.controllerHint.textContent = `目标从控端 Peer ID: ${targetPeerId}`;
+            els.btnApply.textContent = '确定并推送全屏';
+            setStatusPill(els.controllerNetStatus, '正在连接从控端', 'neutral');
+            if (fromUrl) {
+                els.autoMasterHint.classList.remove('hidden');
+            }
+            updateControllerPreview();
+            startMasterPeer(targetPeerId);
+        }
+
+        function buildShareLink(peerId) {
+            const url = new URL(window.location.href);
+            url.searchParams.set('peer', peerId);
+            return url.toString();
+        }
+
+        async function renderQrCode(text) {
+            if (!window.QRCode || typeof window.QRCode.toCanvas !== 'function') {
+                setStatusPill(els.slaveStatus, '二维码库加载失败', 'error');
+                return;
+            }
+            try {
+                await window.QRCode.toCanvas(els.qrCanvas, text, {
+                    width: 240,
+                    margin: 1,
+                    color: {
+                        dark: '#0f172a',
+                        light: '#ffffff'
+                    }
+                });
+            } catch (error) {
+                console.error('生成二维码失败:', error);
+                setStatusPill(els.slaveStatus, '二维码生成失败', 'error');
+            }
+        }
+
+        function bindConnection(conn, role) {
+            state.conn = conn;
+
+            conn.on('open', () => {
+                if (role === 'slave') {
+                    setStatusPill(els.slaveStatus, `已连接主控端 ${conn.peer}`, 'success');
+                    conn.send({
+                        type: 'hello',
+                        role: 'slave',
+                        message: 'slave-ready'
+                    });
+                    return;
+                }
+                setStatusPill(els.controllerNetStatus, `已连接从控端 ${conn.peer}`, 'success');
+                sendCurrentColor(false);
+            });
+
+            conn.on('data', (data) => {
+                if (role === 'slave') {
+                    handleSlaveIncoming(data);
+                    return;
+                }
+                handleMasterIncoming(data);
+            });
+
+            conn.on('close', () => {
+                if (role === 'slave') {
+                    setStatusPill(els.slaveStatus, '主控端已断开，等待重连', 'neutral');
+                } else {
+                    setStatusPill(els.controllerNetStatus, '连接已断开', 'error');
+                }
+                state.conn = null;
+            });
+
+            conn.on('error', (error) => {
+                console.error('连接异常:', error);
+                if (role === 'slave') {
+                    setStatusPill(els.slaveStatus, '连接异常', 'error');
+                } else {
+                    setStatusPill(els.controllerNetStatus, '连接异常', 'error');
+                }
+            });
+        }
+
+        function startSlavePeer() {
+            if (!window.Peer) {
+                setStatusPill(els.slaveStatus, 'PeerJS 加载失败', 'error');
+                return;
+            }
+
+            const peer = new window.Peer();
+            state.peer = peer;
+
+            peer.on('open', async (id) => {
+                els.slavePeerId.textContent = id;
+                const shareLink = buildShareLink(id);
+                els.shareUrl.textContent = shareLink;
+                els.shareUrl.href = shareLink;
+                await renderQrCode(shareLink);
+                setStatusPill(els.slaveStatus, '等待主控端连接', 'neutral');
+            });
+
+            peer.on('connection', (conn) => {
+                if (state.conn && state.conn.open) {
+                    state.conn.close();
+                }
+                bindConnection(conn, 'slave');
+            });
+
+            peer.on('error', (error) => {
+                console.error('Peer 错误:', error);
+                setStatusPill(els.slaveStatus, `Peer 错误: ${error.type || 'unknown'}`, 'error');
+            });
+
+            peer.on('disconnected', () => {
+                setStatusPill(els.slaveStatus, '连接中断，等待恢复', 'error');
+            });
+
+            peer.on('close', () => {
+                setStatusPill(els.slaveStatus, 'Peer 已关闭', 'error');
+            });
+        }
+
+        function startMasterPeer(targetPeerId) {
+            if (!window.Peer) {
+                setStatusPill(els.controllerNetStatus, 'PeerJS 加载失败', 'error');
+                return;
+            }
+
+            const peer = new window.Peer();
+            state.peer = peer;
+
+            peer.on('open', () => {
+                const conn = peer.connect(targetPeerId, {
+                    reliable: true
+                });
+                bindConnection(conn, 'master');
+            });
+
+            peer.on('error', (error) => {
+                console.error('Peer 错误:', error);
+                setStatusPill(els.controllerNetStatus, `Peer 错误: ${error.type || 'unknown'}`, 'error');
+            });
+
+            peer.on('disconnected', () => {
+                setStatusPill(els.controllerNetStatus, '连接中断', 'error');
+            });
+
+            peer.on('close', () => {
+                setStatusPill(els.controllerNetStatus, 'Peer 已关闭', 'error');
+            });
+        }
+
+        function getPayload() {
+            const adjusted = getAdjustedColor(state.base, state.brightness);
+            return {
+                base: {
+                    r: state.base.r,
+                    g: state.base.g,
+                    b: state.base.b
+                },
+                brightness: state.brightness,
+                adjusted,
+                timestamp: Date.now()
+            };
+        }
+
+        function sendCurrentColor(fullscreen) {
+            if (state.mode !== 'remote-master' || !state.conn || !state.conn.open) {
+                return;
+            }
+
+            state.conn.send({
+                type: 'color-sync',
+                payload: getPayload(),
+                fullscreen: !!fullscreen
+            });
+        }
+
+        function queueColorSend() {
+            if (state.mode !== 'remote-master') {
+                return;
+            }
+            if (state.sendTimer) {
+                window.clearTimeout(state.sendTimer);
+            }
+            state.sendTimer = window.setTimeout(() => {
+                sendCurrentColor(false);
+            }, 30);
+        }
+
+        function applyPayloadLocally(payload, fullscreen) {
+            if (!payload) {
+                return;
+            }
+            const base = payload.base || state.base;
+            const brightness = Number.isFinite(payload.brightness) ? payload.brightness : state.brightness;
+            const adjusted = payload.adjusted || getAdjustedColor(base, brightness);
+
+            state.base = {
+                r: clampChannel(base.r),
+                g: clampChannel(base.g),
+                b: clampChannel(base.b)
+            };
+            state.brightness = clampBrightness(brightness);
+
+            updateReceiverPreview(adjusted, state.base, state.brightness);
+
+            if (fullscreen) {
+                showColorStage(adjusted, true);
+            }
+        }
+
+        function handleSlaveIncoming(data) {
+            if (!data || typeof data !== 'object') {
+                return;
+            }
+            if (data.type === 'color-sync') {
+                applyPayloadLocally(data.payload, data.fullscreen);
+            }
+        }
+
+        function handleMasterIncoming(data) {
+            if (!data || typeof data !== 'object') {
+                return;
+            }
+            if (data.type === 'hello') {
+                showToast('从控端已就绪，开始推送颜色');
+            }
+        }
+
+        async function copyText(text, successMessage) {
+            if (!text || text === '#') {
+                showToast('当前没有可复制内容');
+                return;
+            }
+            try {
+                await navigator.clipboard.writeText(text);
+                showToast(successMessage);
+            } catch (error) {
+                console.error('复制失败:', error);
+                showToast('复制失败，请手动复制');
+            }
+        }
+
+        function bindControlEvents() {
+            const channelBindings = [
+                { key: 'r', input: els.inputR },
+                { key: 'g', input: els.inputG },
+                { key: 'b', input: els.inputB }
+            ];
+
+            channelBindings.forEach(({ key, input }) => {
+                input.addEventListener('input', () => {
+                    state.base[key] = clampChannel(Number(input.value));
+                    updateControllerPreview();
+                    queueColorSend();
+                });
+            });
+
+            els.inputHex.addEventListener('input', () => {
+                state.base = hexToRgb(els.inputHex.value);
+                updateControllerPreview();
+                queueColorSend();
+            });
+
+            els.inputBrightness.addEventListener('input', () => {
+                state.brightness = clampBrightness(Number(els.inputBrightness.value));
+                updateControllerPreview();
+                queueColorSend();
+            });
+
+            els.btnApply.addEventListener('click', () => {
+                if (state.mode === 'remote-master') {
+                    sendCurrentColor(true);
+                    const adjusted = getAdjustedColor(state.base, state.brightness);
+                    showColorStage(adjusted, true);
+                    return;
+                }
+                toggleColorStage();
+            });
+
+            els.btnBackFromController.addEventListener('click', () => {
+                enterModePicker();
+            });
+
+            els.btnModeLocal.addEventListener('click', () => {
+                enterLocalMode();
+            });
+
+            els.btnModeSlave.addEventListener('click', () => {
+                enterSlaveMode();
+            });
+
+            els.btnCopyPeer.addEventListener('click', () => {
+                copyText(els.slavePeerId.textContent, 'Peer ID 已复制');
+            });
+
+            els.btnCopyLink.addEventListener('click', () => {
+                const href = els.shareUrl.getAttribute('href');
+                if (!href || href === '#') {
+                    showToast('链接尚未生成');
+                    return;
+                }
+                copyText(href, '链接已复制');
+            });
+
+            els.btnRestartSlave.addEventListener('click', () => {
+                if (state.mode !== 'remote-slave') {
+                    return;
+                }
+                destroyPeerResources();
+                startSlavePeer();
+                showToast('已重新生成连接信息');
+            });
+
+            els.btnBackFromReceiver.addEventListener('click', () => {
+                enterModePicker();
+            });
+
+            els.fullscreenStage.addEventListener('click', () => {
+                hideColorStage();
+            });
+
+            document.addEventListener('fullscreenchange', () => {
+                if (!document.fullscreenElement) {
+                    els.fullscreenStage.classList.remove('visible');
+                }
+            });
+        }
+
+        function initializeMode() {
+            const params = new URLSearchParams(window.location.search);
+            const peerId = (params.get('peer') || params.get('peerId') || '').trim();
+
+            if (peerId) {
+                enterMasterMode(peerId, true);
+                return;
+            }
+
+            enterModePicker();
+        }
+
+        bindControlEvents();
+        updateControllerPreview();
+        updateReceiverPreview(getAdjustedColor(state.base, state.brightness), state.base, state.brightness);
+        initializeMode();
+    </script>
+</body>
+</html>
