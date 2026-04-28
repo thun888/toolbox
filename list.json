@@ -47,6 +47,11 @@
                 "title": "视觉参数计算器",
                 "description": "计算传感器靶面物理尺寸、规格系数，以及镜头分辨率对应的最小像元尺寸。",
                 "url": "html/视觉参数计算器/index.html"
+            },
+            {
+                "title": "远控颜色",
+                "description": "本地调色与 PeerJS 远程主从控制，支持 RGB、色盘、亮度与全屏展示。",
+                "url": "html/远控颜色/index.html"
             }
         ]
     },
