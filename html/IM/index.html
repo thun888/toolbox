@@ -604,59 +604,145 @@
             return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
         }
 
-        // ── storage ──
-        function loadStore() {
-            try {
-                const raw = localStorage.getItem(STORAGE_KEY);
-                if (raw) return JSON.parse(raw);
-            } catch (e) { /* ignore */ }
-            return { contacts: [], messages: {}, lastActive: null };
+        // ── IndexedDB storage ──
+        const DB_NAME = 'p2p_im_db';
+        const DB_VERSION = 1;
+
+        function openDB() {
+            return new Promise((resolve, reject) => {
+                const req = indexedDB.open(DB_NAME, DB_VERSION);
+                req.onupgradeneeded = (e) => {
+                    const db = e.target.result;
+                    if (!db.objectStoreNames.contains('messages')) {
+                        const msgs = db.createObjectStore('messages', { keyPath: 'id' });
+                        msgs.createIndex('peerId', 'peerId', { unique: false });
+                        msgs.createIndex('peerTimestamp', ['peerId', 'timestamp'], { unique: false });
+                    }
+                    if (!db.objectStoreNames.contains('contacts')) {
+                        db.createObjectStore('contacts', { keyPath: 'peerId' });
+                    }
+                    if (!db.objectStoreNames.contains('meta')) {
+                        db.createObjectStore('meta', { keyPath: 'key' });
+                    }
+                };
+                req.onsuccess = (e) => resolve(e.target.result);
+                req.onerror = (e) => reject(e.target.error);
+            });
         }
 
-        function saveStore(store) {
-            try {
-                localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
-            } catch (e) {
-                showToast('存储空间不足，请清理旧对话');
-            }
+        function dbPut(storeName, value) {
+            return openDB().then(db => {
+                return new Promise((resolve, reject) => {
+                    const tx = db.transaction(storeName, 'readwrite');
+                    tx.objectStore(storeName).put(value);
+                    tx.oncomplete = () => { db.close(); resolve(); };
+                    tx.onerror = () => { db.close(); reject(tx.error); };
+                });
+            });
         }
 
-        function getMessages(peerId) {
-            const store = loadStore();
-            return store.messages[peerId] || [];
+        function dbGet(storeName, key) {
+            return openDB().then(db => {
+                return new Promise((resolve, reject) => {
+                    const tx = db.transaction(storeName, 'readonly');
+                    const req = tx.objectStore(storeName).get(key);
+                    req.onsuccess = () => { db.close(); resolve(req.result); };
+                    req.onerror = () => { db.close(); reject(req.error); };
+                });
+            });
         }
 
-        function addMessage(peerId, msg) {
-            const store = loadStore();
-            if (!store.messages[peerId]) store.messages[peerId] = [];
-            store.messages[peerId].push(msg);
-            saveStore(store);
+        function dbGetAll(storeName) {
+            return openDB().then(db => {
+                return new Promise((resolve, reject) => {
+                    const tx = db.transaction(storeName, 'readonly');
+                    const req = tx.objectStore(storeName).getAll();
+                    req.onsuccess = () => { db.close(); resolve(req.result); };
+                    req.onerror = () => { db.close(); reject(req.error); };
+                });
+            });
         }
 
-        function deleteMessages(peerId) {
-            const store = loadStore();
-            delete store.messages[peerId];
-            store.contacts = store.contacts.filter((c) => c !== peerId);
-            if (store.lastActive === peerId) store.lastActive = null;
-            saveStore(store);
+        async function getMessages(peerId) {
+            const db = await openDB();
+            return new Promise((resolve, reject) => {
+                const tx = db.transaction('messages', 'readonly');
+                const idx = tx.objectStore('messages').index('peerId');
+                const req = idx.getAll(peerId);
+                req.onsuccess = () => {
+                    db.close();
+                    resolve(req.result.sort((a, b) => a.timestamp - b.timestamp));
+                };
+                req.onerror = () => { db.close(); reject(req.error); };
+            });
         }
 
-        function clearAllMessages() {
-            localStorage.removeItem(STORAGE_KEY);
+        async function addMessage(peerId, msg) {
+            msg.peerId = peerId;
+            await dbPut('messages', msg);
         }
 
-        function addContact(peerId) {
-            const store = loadStore();
-            if (!store.contacts.includes(peerId)) {
-                store.contacts.push(peerId);
-                saveStore(store);
-            }
+        async function deleteMessages(peerId) {
+            const db = await openDB();
+            return new Promise((resolve, reject) => {
+                const tx = db.transaction(['messages', 'contacts', 'meta'], 'readwrite');
+                const idx = tx.objectStore('messages').index('peerId');
+                const cursorReq = idx.openCursor(IDBKeyRange.only(peerId));
+                cursorReq.onsuccess = (e) => {
+                    const cursor = e.target.result;
+                    if (cursor) { cursor.delete(); cursor.continue(); }
+                };
+                tx.objectStore('contacts').delete(peerId);
+                const metaReq = tx.objectStore('meta').get('lastActive');
+                metaReq.onsuccess = () => {
+                    if (metaReq.result && metaReq.result.value === peerId) {
+                        tx.objectStore('meta').delete('lastActive');
+                    }
+                };
+                tx.oncomplete = () => { db.close(); resolve(); };
+                tx.onerror = () => { db.close(); reject(tx.error); };
+            });
         }
 
-        function setLastActive(peerId) {
-            const store = loadStore();
-            store.lastActive = peerId;
-            saveStore(store);
+        async function clearAllMessages() {
+            const db = await openDB();
+            return new Promise((resolve, reject) => {
+                const tx = db.transaction(['messages', 'contacts', 'meta'], 'readwrite');
+                tx.objectStore('messages').clear();
+                tx.objectStore('contacts').clear();
+                tx.objectStore('meta').clear();
+                tx.oncomplete = () => { db.close(); resolve(); };
+                tx.onerror = () => { db.close(); reject(tx.error); };
+            });
+        }
+
+        async function addContact(peerId) {
+            const db = await openDB();
+            return new Promise((resolve, reject) => {
+                const tx = db.transaction('contacts', 'readwrite');
+                const req = tx.objectStore('contacts').get(peerId);
+                req.onsuccess = () => {
+                    if (!req.result) {
+                        tx.objectStore('contacts').put({ peerId });
+                    }
+                };
+                tx.oncomplete = () => { db.close(); resolve(); };
+                tx.onerror = () => { db.close(); reject(tx.error); };
+            });
+        }
+
+        async function getContacts() {
+            const list = await dbGetAll('contacts');
+            return list.map(c => c.peerId);
+        }
+
+        async function setLastActive(peerId) {
+            await dbPut('meta', { key: 'lastActive', value: peerId });
+        }
+
+        async function getLastActive() {
+            const result = await dbGet('meta', 'lastActive');
+            return result ? result.value : null;
         }
 
         // ── DOM refs ──
@@ -760,17 +846,16 @@
 
         function handleIncomingConnection(conn) {
             bindDataConnection(conn, conn.peer);
-            addContact(conn.peer);
-            renderContacts();
+            addContact(conn.peer).then(() => renderContacts());
             showToast('新联系人已连接: ' + conn.peer);
         }
 
         function bindDataConnection(conn, peerId) {
             state.connections[peerId] = conn;
 
-            conn.on('open', () => {
-                addContact(peerId);
-                renderContacts();
+            conn.on('open', async () => {
+                await addContact(peerId);
+                await renderContacts();
                 if (state.activePeer === peerId) {
                     enableChatInput(true);
                 }
@@ -924,7 +1009,7 @@
         }
 
         // ── message handling ──
-        function handleIncomingData(peerId, data) {
+        async function handleIncomingData(peerId, data) {
             if (!data || typeof data !== 'object') return;
 
             const msg = {
@@ -952,16 +1037,16 @@
                     return;
             }
 
-            addContact(peerId);
-            addMessage(peerId, msg);
+            await addContact(peerId);
+            await addMessage(peerId, msg);
             if (state.activePeer === peerId) {
                 appendMessageEl(msg);
                 scrollMessages();
             }
-            renderContacts();
+            await renderContacts();
         }
 
-        function sendTextMessage(peerId, content) {
+        async function sendTextMessage(peerId, content) {
             const msg = {
                 id: uuid(),
                 type: 'text',
@@ -978,15 +1063,15 @@
             if (!sent) {
                 msg.sendFailed = true;
             }
-            addMessage(peerId, msg);
+            await addMessage(peerId, msg);
             appendMessageEl(msg);
             scrollMessages();
-            renderContacts();
+            await renderContacts();
         }
 
         function sendImageMessage(peerId, file) {
             const reader = new FileReader();
-            reader.onload = () => {
+            reader.onload = async () => {
                 const msg = {
                     id: uuid(),
                     type: 'image',
@@ -1003,10 +1088,10 @@
                     timestamp: msg.timestamp
                 });
                 if (!sent) msg.sendFailed = true;
-                addMessage(peerId, msg);
+                await addMessage(peerId, msg);
                 appendMessageEl(msg);
                 scrollMessages();
-                renderContacts();
+                await renderContacts();
             };
             reader.readAsDataURL(file);
         }
@@ -1017,7 +1102,7 @@
                 return;
             }
             const reader = new FileReader();
-            reader.onload = () => {
+            reader.onload = async () => {
                 const msg = {
                     id: uuid(),
                     type: 'file',
@@ -1038,10 +1123,10 @@
                     timestamp: msg.timestamp
                 });
                 if (!sent) msg.sendFailed = true;
-                addMessage(peerId, msg);
+                await addMessage(peerId, msg);
                 appendMessageEl(msg);
                 scrollMessages();
-                renderContacts();
+                await renderContacts();
             };
             reader.readAsDataURL(file);
         }
@@ -1118,25 +1203,25 @@
             });
         }
 
-        function renderMessages(peerId) {
+        async function renderMessages(peerId) {
             els.messagesContainer.innerHTML = '';
-            const msgs = getMessages(peerId);
+            const msgs = await getMessages(peerId);
             msgs.forEach((msg) => appendMessageEl(msg));
             scrollMessages();
         }
 
-        function renderContacts() {
-            const store = loadStore();
+        async function renderContacts() {
+            const contacts = await getContacts();
             const list = els.contactList;
 
-            if (store.contacts.length === 0) {
+            if (contacts.length === 0) {
                 list.innerHTML = '<div class="empty-contacts">暂无联系人，请添加对方的 Peer ID</div>';
                 return;
             }
 
             list.innerHTML = '';
-            store.contacts.forEach((peerId) => {
-                const msgs = store.messages[peerId] || [];
+            for (const peerId of contacts) {
+                const msgs = await getMessages(peerId);
                 const lastMsg = msgs[msgs.length - 1];
                 const online = isPeerConnected(peerId);
 
@@ -1160,18 +1245,18 @@
                     openChat(peerId);
                 });
 
-                item.querySelector('.btn-del-contact').addEventListener('click', (e) => {
+                item.querySelector('.btn-del-contact').addEventListener('click', async (e) => {
                     e.stopPropagation();
-                    deleteMessages(peerId);
+                    await deleteMessages(peerId);
                     if (state.activePeer === peerId) {
                         closeChat();
                     }
-                    renderContacts();
+                    await renderContacts();
                     showToast('已删除对话');
                 });
 
                 list.appendChild(item);
-            });
+            }
         }
 
         function previewText(msg) {
