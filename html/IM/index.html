@@ -706,6 +706,8 @@
         }
 
         // ── PeerJS init ──
+        let peerReadyCallback = null;
+
         function initPeer() {
             if (!window.Peer) {
                 setTimeout(initPeer, 500);
@@ -719,6 +721,10 @@
                 els.myPeerId.textContent = id;
                 els.statusDot.classList.add('online');
                 showToast('P2P 已就绪');
+                if (peerReadyCallback) {
+                    peerReadyCallback(id);
+                    peerReadyCallback = null;
+                }
             });
 
             peer.on('connection', (conn) => {
@@ -1226,7 +1232,9 @@
                 els.qrModal.classList.add('active');
                 if (window.QRCode && state.myPeerId) {
                     try {
-                        await window.QRCode.toCanvas(els.qrCanvas, state.myPeerId, {
+                        const url = new URL(window.location.href);
+                        url.searchParams.set('peer', state.myPeerId);
+                        await window.QRCode.toCanvas(els.qrCanvas, url.toString(), {
                             width: 220,
                             margin: 1,
                             color: { dark: '#0f172a', light: '#ffffff' }
@@ -1371,13 +1379,41 @@
         // ── init ──
         function init() {
             bindEvents();
-            initPeer();
             renderContacts();
 
-            // Restore last active chat
-            const store = loadStore();
-            if (store.lastActive && store.contacts.includes(store.lastActive)) {
-                openChat(store.lastActive);
+            const params = new URLSearchParams(window.location.search);
+            const urlPeerId = (params.get('peer') || params.get('peerId') || '').trim();
+
+            if (urlPeerId) {
+                // Auto-connect from URL parameter (e.g., scanned QR code)
+                peerReadyCallback = (myId) => {
+                    if (urlPeerId === myId) {
+                        showToast('无法添加自己');
+                        return;
+                    }
+                    addContact(urlPeerId);
+                    connectToPeer(urlPeerId);
+                    renderContacts();
+                    openChat(urlPeerId);
+                    window.history.replaceState({}, '', window.location.pathname);
+                };
+            }
+
+            initPeer();
+
+            // Restore last active chat (only if no URL param directed us elsewhere)
+            if (!urlPeerId) {
+                const store = loadStore();
+                if (store.lastActive && store.contacts.includes(store.lastActive)) {
+                    // Defer until peer is ready if not already
+                    if (state.myPeerId) {
+                        openChat(store.lastActive);
+                    } else {
+                        peerReadyCallback = () => {
+                            openChat(store.lastActive);
+                        };
+                    }
+                }
             }
         }
 
