@@ -1,0 +1,1388 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>P2P IM</title>
+    <link rel="stylesheet" href="https://static.hzchu.top/mdui@2/mdui.css">
+    <script src="https://static.hzchu.top/mdui@2/mdui.global.js"></script>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <script src="https://static.hzchu.top/peerjs@1.5.4/dist/peerjs.min.js"></script>
+    <script src="https://static.hzchu.top/qrcode/build/qrcode.min.js"></script>
+    <style>
+        :root {
+            --bg-a: #fcf3e6;
+            --bg-b: #e9f7ff;
+            --bg-c: #f5fff3;
+            --panel: rgba(255, 255, 255, 0.78);
+            --text-main: #1f2937;
+            --text-soft: #4b5563;
+            --line: rgba(15, 23, 42, 0.12);
+            --accent: #ea580c;
+            --accent-soft: #ffedd5;
+            --success: #047857;
+            --danger: #b91c1c;
+            --chat-self: #ffedd5;
+            --chat-peer: #e9f7ff;
+            --mono: "JetBrains Mono", "Consolas", monospace;
+            --ui: "Noto Sans SC", "Microsoft YaHei", sans-serif;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            min-height: 100vh;
+            font-family: var(--ui);
+            color: var(--text-main);
+            background:
+                radial-gradient(1200px 700px at 5% -15%, var(--bg-a), transparent),
+                radial-gradient(1000px 580px at 95% 0%, var(--bg-b), transparent),
+                linear-gradient(130deg, var(--bg-c), #fffaf2);
+            overflow: hidden;
+        }
+
+        .bg-orb {
+            position: fixed;
+            border-radius: 999px;
+            filter: blur(40px);
+            opacity: 0.55;
+            pointer-events: none;
+            z-index: -1;
+            animation: drift 18s ease-in-out infinite alternate;
+        }
+        .orb-a { width: 260px; height: 260px; top: 12vh; left: -60px; background: #f97316; }
+        .orb-b { width: 320px; height: 320px; right: -100px; top: 34vh; background: #0ea5e9; animation-duration: 24s; }
+
+        @keyframes drift {
+            from { transform: translateY(-12px) translateX(0px); }
+            to { transform: translateY(16px) translateX(12px); }
+        }
+
+        .app {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            max-width: 1200px;
+            margin: 0 auto;
+            animation: reveal 0.36s ease-out;
+        }
+
+        @keyframes reveal {
+            from { transform: translateY(8px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        /* Header */
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 20px;
+            background: var(--panel);
+            border-bottom: 1px solid var(--line);
+            backdrop-filter: blur(12px);
+            gap: 12px;
+            flex-shrink: 0;
+        }
+        .header h1 { font-size: 1.2rem; white-space: nowrap; }
+        .header-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+        .my-id {
+            font-family: var(--mono);
+            font-size: 0.82rem;
+            background: #f8fafc;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            padding: 4px 10px;
+            color: #0f172a;
+        }
+        .status-dot {
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            background: #94a3b8;
+            flex-shrink: 0;
+        }
+        .status-dot.online { background: #22c55e; }
+
+        .btn-sm {
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            padding: 4px 12px;
+            font-size: 0.82rem;
+            cursor: pointer;
+            background: #f8fafc;
+            color: var(--text-main);
+            font-family: inherit;
+            white-space: nowrap;
+            transition: transform 0.12s ease;
+        }
+        .btn-sm:active { transform: translateY(1px); }
+        .btn-sm.danger { color: var(--danger); border-color: #fca5a5; background: #fff5f5; }
+
+        /* Main layout */
+        .main {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 300px;
+            flex-shrink: 0;
+            border-right: 1px solid var(--line);
+            background: rgba(255,255,255,0.6);
+            backdrop-filter: blur(8px);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .add-contact-bar {
+            display: flex;
+            gap: 8px;
+            padding: 12px;
+            border-bottom: 1px solid var(--line);
+        }
+        .add-contact-bar input {
+            flex: 1;
+            border: 1px solid rgba(15,23,42,0.18);
+            border-radius: 10px;
+            padding: 8px 10px;
+            font-family: inherit;
+            font-size: 0.85rem;
+            background: rgba(255,255,255,0.8);
+            min-width: 0;
+        }
+        .add-contact-bar button {
+            border: 0;
+            border-radius: 10px;
+            padding: 8px 14px;
+            background: linear-gradient(130deg, #ea580c, #f97316);
+            color: #fff;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 0.85rem;
+            white-space: nowrap;
+            transition: transform 0.12s ease, box-shadow 0.2s ease;
+            box-shadow: 0 4px 12px rgba(249,115,22,0.25);
+        }
+        .add-contact-bar button:active { transform: translateY(1px); }
+
+        .contact-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 8px;
+        }
+        .contact-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 12px;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: background 0.12s ease;
+        }
+        .contact-item:hover { background: rgba(234,88,12,0.06); }
+        .contact-item.active { background: var(--accent-soft); }
+        .contact-avatar {
+            width: 40px; height: 40px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #f97316, #ea580c);
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.9rem;
+            font-weight: 600;
+            flex-shrink: 0;
+        }
+        .contact-info { flex: 1; min-width: 0; }
+        .contact-name {
+            font-size: 0.92rem;
+            font-weight: 500;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .contact-preview {
+            font-size: 0.78rem;
+            color: var(--text-soft);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .contact-actions { display: flex; gap: 4px; flex-shrink: 0; }
+        .contact-actions button {
+            width: 28px; height: 28px;
+            border: 0;
+            border-radius: 6px;
+            background: transparent;
+            cursor: pointer;
+            font-size: 0.85rem;
+            color: #94a3b8;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: color 0.12s, background 0.12s;
+        }
+        .contact-actions button:hover { color: var(--danger); background: #fee2e2; }
+
+        .empty-contacts {
+            text-align: center;
+            padding: 40px 16px;
+            color: var(--text-soft);
+            font-size: 0.9rem;
+        }
+
+        /* Chat area */
+        .chat-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            background: rgba(255,255,255,0.4);
+        }
+        .chat-empty {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-soft);
+            font-size: 1rem;
+        }
+
+        .chat-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 20px;
+            border-bottom: 1px solid var(--line);
+            background: var(--panel);
+            backdrop-filter: blur(8px);
+            gap: 10px;
+        }
+        .chat-header-peer { font-weight: 600; font-size: 0.95rem; }
+        .chat-header-id {
+            font-family: var(--mono);
+            font-size: 0.75rem;
+            color: var(--text-soft);
+        }
+        .chat-header-actions { display: flex; gap: 6px; }
+
+        .messages-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .msg-row {
+            display: flex;
+            max-width: 75%;
+            animation: msgIn 0.2s ease-out;
+        }
+        @keyframes msgIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+        .msg-row.self { align-self: flex-end; }
+        .msg-row.peer { align-self: flex-start; }
+        .msg-row.system { align-self: center; max-width: 90%; }
+
+        .msg-bubble {
+            padding: 10px 14px;
+            border-radius: 16px;
+            font-size: 0.9rem;
+            line-height: 1.5;
+            word-break: break-word;
+            position: relative;
+        }
+        .msg-row.self .msg-bubble {
+            background: linear-gradient(135deg, #fff7ed, var(--chat-self));
+            border: 1px solid #fed7aa;
+            border-bottom-right-radius: 4px;
+        }
+        .msg-row.peer .msg-bubble {
+            background: linear-gradient(135deg, #f8fafc, var(--chat-peer));
+            border: 1px solid #bae6fd;
+            border-bottom-left-radius: 4px;
+        }
+        .msg-row.system .msg-bubble {
+            background: #f1f5f9;
+            color: #64748b;
+            font-size: 0.8rem;
+            padding: 6px 12px;
+            border-radius: 10px;
+        }
+
+        .msg-time {
+            font-size: 0.7rem;
+            color: #94a3b8;
+            margin-top: 2px;
+            padding: 0 4px;
+        }
+        .msg-row.self .msg-time { text-align: right; }
+        .msg-row.peer .msg-time { text-align: left; }
+
+        .msg-image {
+            max-width: 240px;
+            max-height: 240px;
+            border-radius: 10px;
+            cursor: pointer;
+            object-fit: cover;
+        }
+        .msg-file {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 12px;
+            background: rgba(255,255,255,0.6);
+            border-radius: 10px;
+            border: 1px solid rgba(15,23,42,0.1);
+            cursor: pointer;
+        }
+        .msg-file-icon { font-size: 1.5rem; }
+        .msg-file-info { min-width: 0; }
+        .msg-file-name { font-size: 0.85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .msg-file-size { font-size: 0.75rem; color: var(--text-soft); }
+
+        /* Input area */
+        .input-area {
+            padding: 12px 20px;
+            border-top: 1px solid var(--line);
+            background: var(--panel);
+            backdrop-filter: blur(8px);
+            display: flex;
+            gap: 10px;
+            align-items: flex-end;
+        }
+        .input-area textarea {
+            flex: 1;
+            border: 1px solid rgba(15,23,42,0.18);
+            border-radius: 14px;
+            padding: 10px 14px;
+            font-family: inherit;
+            font-size: 0.9rem;
+            resize: none;
+            min-height: 42px;
+            max-height: 120px;
+            background: rgba(255,255,255,0.8);
+            outline: none;
+            line-height: 1.4;
+        }
+        .input-area textarea:focus { border-color: #f97316; }
+        .input-actions { display: flex; gap: 6px; align-items: center; }
+        .icon-btn {
+            width: 38px; height: 38px;
+            border: 1px solid rgba(15,23,42,0.14);
+            border-radius: 10px;
+            background: rgba(255,255,255,0.8);
+            cursor: pointer;
+            font-size: 1.1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.12s ease, border-color 0.2s;
+            color: var(--text-soft);
+        }
+        .icon-btn:hover { border-color: #f97316; }
+        .icon-btn:active { transform: translateY(1px); }
+        .send-btn {
+            width: 42px; height: 42px;
+            border: 0;
+            border-radius: 12px;
+            background: linear-gradient(130deg, #ea580c, #f97316);
+            color: #fff;
+            cursor: pointer;
+            font-size: 1.2rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.12s ease;
+            box-shadow: 0 4px 12px rgba(249,115,22,0.3);
+        }
+        .send-btn:active { transform: translateY(1px); }
+        .send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+        /* Call overlay */
+        .call-overlay {
+            position: fixed; inset: 0;
+            background: rgba(2,6,23,0.85);
+            backdrop-filter: blur(8px);
+            z-index: 999;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+        }
+        .call-overlay.active { display: flex; }
+        .call-remote-video {
+            width: min(640px, 90vw);
+            height: min(480px, 50vh);
+            background: #1e293b;
+            border-radius: 16px;
+            object-fit: cover;
+        }
+        .call-local-video {
+            position: absolute;
+            bottom: 120px;
+            right: 40px;
+            width: 160px;
+            height: 120px;
+            background: #334155;
+            border-radius: 10px;
+            object-fit: cover;
+            border: 2px solid rgba(255,255,255,0.3);
+        }
+        .call-info { color: #f8fafc; font-size: 1rem; text-align: center; }
+        .call-controls { display: flex; gap: 16px; }
+        .call-btn {
+            width: 56px; height: 56px;
+            border-radius: 50%;
+            border: 0;
+            cursor: pointer;
+            font-size: 1.4rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.12s;
+        }
+        .call-btn:active { transform: scale(0.92); }
+        .call-btn.hangup { background: #dc2626; color: #fff; }
+        .call-btn.accept { background: #22c55e; color: #fff; }
+
+        /* QR modal */
+        .modal-overlay {
+            position: fixed; inset: 0;
+            background: rgba(2,6,23,0.5);
+            backdrop-filter: blur(4px);
+            z-index: 998;
+            display: none;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-overlay.active { display: flex; }
+        .modal {
+            background: var(--panel);
+            backdrop-filter: blur(16px);
+            border: 1px solid var(--line);
+            border-radius: 20px;
+            padding: 24px;
+            width: min(380px, 90vw);
+            box-shadow: 0 16px 48px rgba(15,23,42,0.15);
+            text-align: center;
+        }
+        .modal h3 { margin-bottom: 12px; font-size: 1.1rem; }
+        .modal .peer-id-display {
+            font-family: var(--mono);
+            background: #f8fafc;
+            border: 1px solid #cbd5e1;
+            border-radius: 10px;
+            padding: 8px 12px;
+            margin: 8px 0;
+            font-size: 0.85rem;
+            word-break: break-all;
+        }
+
+        /* File input hidden */
+        .hidden-input { display: none; }
+
+        .unread-badge {
+            background: #f97316;
+            color: #fff;
+            font-size: 0.7rem;
+            border-radius: 999px;
+            padding: 2px 7px;
+            margin-left: 6px;
+        }
+
+        @media (max-width: 700px) {
+            .sidebar { width: 100%; }
+            .main { flex-direction: column; }
+            .chat-area { display: none; }
+            .chat-area.show-mobile { display: flex; position: fixed; inset: 0; z-index: 100; }
+            .sidebar.hide-mobile { display: none; }
+            .header h1 { font-size: 1rem; }
+            .header-right { gap: 6px; }
+            .my-id { font-size: 0.72rem; padding: 3px 6px; }
+            .call-local-video { bottom: 100px; right: 16px; width: 100px; height: 75px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="bg-orb orb-a"></div>
+    <div class="bg-orb orb-b"></div>
+
+    <div class="app">
+        <header class="header">
+            <h1>P2P IM</h1>
+            <div class="header-right">
+                <span class="status-dot" id="statusDot"></span>
+                <span class="my-id" id="myPeerId">初始化中...</span>
+                <button class="btn-sm" id="btnCopyId">复制 ID</button>
+                <button class="btn-sm" id="btnShowQr">二维码</button>
+                <button class="btn-sm danger" id="btnClearAll">清空记录</button>
+            </div>
+        </header>
+
+        <div class="main">
+            <aside class="sidebar" id="sidebar">
+                <div class="add-contact-bar">
+                    <input type="text" id="addPeerInput" placeholder="输入对方 Peer ID 添加联系人">
+                    <button id="btnAddContact">添加</button>
+                </div>
+                <div class="contact-list" id="contactList">
+                    <div class="empty-contacts">暂无联系人，请添加对方的 Peer ID</div>
+                </div>
+            </aside>
+
+            <section class="chat-area" id="chatArea">
+                <div class="chat-empty" id="chatEmpty">选择联系人开始对话</div>
+                <div id="chatPanel" style="display:none; flex-direction:column; flex:1; overflow:hidden;">
+                    <div class="chat-header">
+                        <div>
+                            <div class="chat-header-peer" id="chatPeerName"></div>
+                            <div class="chat-header-id" id="chatPeerId"></div>
+                        </div>
+                        <div class="chat-header-actions">
+                            <button class="btn-sm" id="btnCallVoice" title="语音通话">📞 语音</button>
+                            <button class="btn-sm" id="btnCallVideo" title="视频通话">📹 视频</button>
+                            <button class="btn-sm danger" id="btnDeleteChat">删除对话</button>
+                        </div>
+                    </div>
+                    <div class="messages-container" id="messagesContainer"></div>
+                    <div class="input-area">
+                        <textarea id="msgInput" rows="1" placeholder="输入消息..." disabled></textarea>
+                        <div class="input-actions">
+                            <input type="file" id="fileInput" class="hidden-input" accept="image/*">
+                            <button class="icon-btn" id="btnSendImage" title="发送图片">🖼</button>
+                            <input type="file" id="docInput" class="hidden-input">
+                            <button class="icon-btn" id="btnSendFile" title="发送文件">📎</button>
+                            <button class="send-btn" id="btnSend" disabled title="发送">➤</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <!-- Call overlay -->
+    <div class="call-overlay" id="callOverlay">
+        <video class="call-remote-video" id="remoteVideo" autoplay playsinline></video>
+        <video class="call-local-video" id="localVideo" autoplay playsinline muted></video>
+        <div class="call-info" id="callInfo"></div>
+        <div class="call-controls" id="callControls"></div>
+    </div>
+
+    <!-- QR modal -->
+    <div class="modal-overlay" id="qrModal">
+        <div class="modal">
+            <h3>你的 Peer ID</h3>
+            <div class="peer-id-display" id="qrPeerId"></div>
+            <canvas id="qrCanvas" width="220" height="220" style="margin: 12px auto; display:block;"></canvas>
+            <p style="font-size:0.82rem; color:var(--text-soft); margin: 8px 0;">让对方扫码添加你为联系人</p>
+            <button class="btn-sm" id="btnCloseQr">关闭</button>
+        </div>
+    </div>
+
+    <script>
+    (function () {
+        const STORAGE_KEY = 'p2p_im';
+
+        function uuid() {
+            return 'm_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
+        }
+
+        function formatTime(ts) {
+            const d = new Date(ts);
+            const pad = (n) => String(n).padStart(2, '0');
+            return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+        }
+
+        // ── storage ──
+        function loadStore() {
+            try {
+                const raw = localStorage.getItem(STORAGE_KEY);
+                if (raw) return JSON.parse(raw);
+            } catch (e) { /* ignore */ }
+            return { contacts: [], messages: {}, lastActive: null };
+        }
+
+        function saveStore(store) {
+            try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
+            } catch (e) {
+                showToast('存储空间不足，请清理旧对话');
+            }
+        }
+
+        function getMessages(peerId) {
+            const store = loadStore();
+            return store.messages[peerId] || [];
+        }
+
+        function addMessage(peerId, msg) {
+            const store = loadStore();
+            if (!store.messages[peerId]) store.messages[peerId] = [];
+            store.messages[peerId].push(msg);
+            saveStore(store);
+        }
+
+        function deleteMessages(peerId) {
+            const store = loadStore();
+            delete store.messages[peerId];
+            store.contacts = store.contacts.filter((c) => c !== peerId);
+            if (store.lastActive === peerId) store.lastActive = null;
+            saveStore(store);
+        }
+
+        function clearAllMessages() {
+            localStorage.removeItem(STORAGE_KEY);
+        }
+
+        function addContact(peerId) {
+            const store = loadStore();
+            if (!store.contacts.includes(peerId)) {
+                store.contacts.push(peerId);
+                saveStore(store);
+            }
+        }
+
+        function setLastActive(peerId) {
+            const store = loadStore();
+            store.lastActive = peerId;
+            saveStore(store);
+        }
+
+        // ── DOM refs ──
+        const $ = (id) => document.getElementById(id);
+
+        const els = {
+            statusDot: $('statusDot'),
+            myPeerId: $('myPeerId'),
+            contactList: $('contactList'),
+            addPeerInput: $('addPeerInput'),
+            chatArea: $('chatArea'),
+            chatEmpty: $('chatEmpty'),
+            chatPanel: $('chatPanel'),
+            chatPeerName: $('chatPeerName'),
+            chatPeerId: $('chatPeerId'),
+            messagesContainer: $('messagesContainer'),
+            msgInput: $('msgInput'),
+            fileInput: $('fileInput'),
+            docInput: $('docInput'),
+            callOverlay: $('callOverlay'),
+            remoteVideo: $('remoteVideo'),
+            localVideo: $('localVideo'),
+            callInfo: $('callInfo'),
+            callControls: $('callControls'),
+            qrModal: $('qrModal'),
+            qrPeerId: $('qrPeerId'),
+            qrCanvas: $('qrCanvas')
+        };
+
+        // ── state ──
+        const state = {
+            myPeerId: null,
+            peer: null,
+            connections: {},   // peerId -> DataConnection
+            mediaCalls: {},    // callId -> MediaConnection
+            localStream: null,
+            activePeer: null,
+            currentCall: null
+        };
+
+        function showToast(msg) {
+            if (window.mdui && typeof mdui.snackbar === 'function') {
+                mdui.snackbar({ message: msg, placement: 'top' });
+            } else {
+                console.log(msg);
+            }
+        }
+
+        // ── PeerJS init ──
+        function initPeer() {
+            if (!window.Peer) {
+                setTimeout(initPeer, 500);
+                return;
+            }
+            const peer = new window.Peer();
+            state.peer = peer;
+
+            peer.on('open', (id) => {
+                state.myPeerId = id;
+                els.myPeerId.textContent = id;
+                els.statusDot.classList.add('online');
+                showToast('P2P 已就绪');
+            });
+
+            peer.on('connection', (conn) => {
+                handleIncomingConnection(conn);
+            });
+
+            peer.on('call', (call) => {
+                handleIncomingCall(call);
+            });
+
+            peer.on('error', (err) => {
+                console.error('Peer error:', err);
+                showToast('连接错误: ' + (err.type || 'unknown'));
+            });
+
+            peer.on('disconnected', () => {
+                els.statusDot.classList.remove('online');
+                showToast('连接中断，正在重连...');
+                if (state.peer && !state.peer.destroyed) {
+                    state.peer.reconnect();
+                }
+            });
+        }
+
+        // ── connections ──
+        function connectToPeer(peerId) {
+            if (!state.peer || state.peer.destroyed) return;
+            if (state.connections[peerId] && state.connections[peerId].open) return;
+
+            const conn = state.peer.connect(peerId, { reliable: true });
+            bindDataConnection(conn, peerId);
+        }
+
+        function handleIncomingConnection(conn) {
+            bindDataConnection(conn, conn.peer);
+            addContact(conn.peer);
+            renderContacts();
+            showToast('新联系人已连接: ' + conn.peer);
+        }
+
+        function bindDataConnection(conn, peerId) {
+            state.connections[peerId] = conn;
+
+            conn.on('open', () => {
+                addContact(peerId);
+                renderContacts();
+                if (state.activePeer === peerId) {
+                    enableChatInput(true);
+                }
+            });
+
+            conn.on('data', (data) => {
+                handleIncomingData(peerId, data);
+            });
+
+            conn.on('close', () => {
+                delete state.connections[peerId];
+                if (state.activePeer === peerId) {
+                    enableChatInput(false);
+                }
+            });
+
+            conn.on('error', (err) => {
+                console.error('Connection error:', err);
+                delete state.connections[peerId];
+            });
+        }
+
+        function sendToPeer(peerId, data) {
+            const conn = state.connections[peerId];
+            if (conn && conn.open) {
+                conn.send(data);
+                return true;
+            }
+            return false;
+        }
+
+        function isPeerConnected(peerId) {
+            const conn = state.connections[peerId];
+            return !!(conn && conn.open);
+        }
+
+        // ── media calls ──
+        async function startCall(peerId, videoEnabled) {
+            if (state.currentCall) return;
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    audio: true,
+                    video: videoEnabled
+                });
+                state.localStream = stream;
+
+                if (!state.peer || state.peer.destroyed) {
+                    showToast('P2P 未就绪');
+                    return;
+                }
+
+                const call = state.peer.call(peerId, stream);
+                bindMediaCall(call, peerId, 'outgoing', videoEnabled);
+                state.currentCall = call;
+                showCallUI(peerId, 'outgoing', videoEnabled);
+            } catch (err) {
+                console.error('getUserMedia error:', err);
+                showToast('无法访问摄像头/麦克风');
+            }
+        }
+
+        function handleIncomingCall(call) {
+            const peerId = call.peer;
+            showIncomingCallUI(peerId, call);
+            state.currentCall = call;
+
+            call.on('close', () => {
+                endCall();
+            });
+        }
+
+        function bindMediaCall(call, peerId, direction, videoEnabled) {
+            call.on('stream', (remoteStream) => {
+                els.remoteVideo.srcObject = remoteStream;
+                els.callInfo.textContent = direction === 'outgoing'
+                    ? `正在与 ${peerId} 通话...`
+                    : `与 ${peerId} 通话中...`;
+            });
+
+            call.on('close', () => {
+                endCall();
+            });
+
+            call.on('error', (err) => {
+                console.error('Call error:', err);
+                showToast('通话出错');
+                endCall();
+            });
+        }
+
+        function showCallUI(peerId, direction, videoEnabled) {
+            els.callOverlay.classList.add('active');
+            els.callInfo.textContent = direction === 'outgoing' ? `呼叫 ${peerId}...` : `与 ${peerId} 通话中...`;
+
+            if (state.localStream) {
+                els.localVideo.srcObject = state.localStream;
+            }
+            els.localVideo.style.display = videoEnabled ? 'block' : 'none';
+            els.remoteVideo.style.display = videoEnabled ? 'block' : 'none';
+            if (!videoEnabled) {
+                els.remoteVideo.style.display = 'none';
+            }
+
+            els.callControls.innerHTML = `
+                <button class="call-btn hangup" id="btnHangup">📞</button>
+            `;
+            $('btnHangup').addEventListener('click', () => endCall());
+        }
+
+        function showIncomingCallUI(peerId, call) {
+            els.callOverlay.classList.add('active');
+            els.callInfo.textContent = `${peerId} 来电...`;
+            els.localVideo.style.display = 'none';
+            els.remoteVideo.style.display = 'none';
+
+            els.callControls.innerHTML = `
+                <button class="call-btn accept" id="btnAccept">✓</button>
+                <button class="call-btn hangup" id="btnReject">✕</button>
+            `;
+            $('btnAccept').addEventListener('click', async () => {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+                    state.localStream = stream;
+                    call.answer(stream);
+                    bindMediaCall(call, peerId, 'incoming', true);
+                    showCallUI(peerId, 'incoming', true);
+                } catch (err) {
+                    console.error('Answer error:', err);
+                    call.close();
+                    endCall();
+                }
+            });
+            $('btnReject').addEventListener('click', () => {
+                call.close();
+                endCall();
+            });
+        }
+
+        function endCall() {
+            if (state.currentCall) {
+                try { state.currentCall.close(); } catch (e) {}
+                state.currentCall = null;
+            }
+            if (state.localStream) {
+                state.localStream.getTracks().forEach((t) => t.stop());
+                state.localStream = null;
+            }
+            els.callOverlay.classList.remove('active');
+            els.remoteVideo.srcObject = null;
+            els.localVideo.srcObject = null;
+        }
+
+        // ── message handling ──
+        function handleIncomingData(peerId, data) {
+            if (!data || typeof data !== 'object') return;
+
+            const msg = {
+                id: data.id || uuid(),
+                type: data.type,
+                self: false,
+                timestamp: data.timestamp || Date.now()
+            };
+
+            switch (data.type) {
+                case 'text':
+                    msg.content = data.content;
+                    break;
+                case 'image':
+                    msg.name = data.name;
+                    msg.data = data.data;
+                    break;
+                case 'file':
+                    msg.name = data.name;
+                    msg.data = data.data;
+                    msg.size = data.size;
+                    msg.mimeType = data.mimeType;
+                    break;
+                default:
+                    return;
+            }
+
+            addContact(peerId);
+            addMessage(peerId, msg);
+            if (state.activePeer === peerId) {
+                appendMessageEl(msg);
+                scrollMessages();
+            }
+            renderContacts();
+        }
+
+        function sendTextMessage(peerId, content) {
+            const msg = {
+                id: uuid(),
+                type: 'text',
+                content,
+                self: true,
+                timestamp: Date.now()
+            };
+            const sent = sendToPeer(peerId, {
+                id: msg.id,
+                type: 'text',
+                content,
+                timestamp: msg.timestamp
+            });
+            if (!sent) {
+                msg.sendFailed = true;
+            }
+            addMessage(peerId, msg);
+            appendMessageEl(msg);
+            scrollMessages();
+            renderContacts();
+        }
+
+        function sendImageMessage(peerId, file) {
+            const reader = new FileReader();
+            reader.onload = () => {
+                const msg = {
+                    id: uuid(),
+                    type: 'image',
+                    name: file.name,
+                    data: reader.result,
+                    self: true,
+                    timestamp: Date.now()
+                };
+                const sent = sendToPeer(peerId, {
+                    id: msg.id,
+                    type: 'image',
+                    name: file.name,
+                    data: reader.result,
+                    timestamp: msg.timestamp
+                });
+                if (!sent) msg.sendFailed = true;
+                addMessage(peerId, msg);
+                appendMessageEl(msg);
+                scrollMessages();
+                renderContacts();
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function sendFileMessage(peerId, file) {
+            if (file.size > 5 * 1024 * 1024) {
+                showToast('文件过大，请选择小于 5MB 的文件');
+                return;
+            }
+            const reader = new FileReader();
+            reader.onload = () => {
+                const msg = {
+                    id: uuid(),
+                    type: 'file',
+                    name: file.name,
+                    data: reader.result,
+                    size: file.size,
+                    mimeType: file.type,
+                    self: true,
+                    timestamp: Date.now()
+                };
+                const sent = sendToPeer(peerId, {
+                    id: msg.id,
+                    type: 'file',
+                    name: file.name,
+                    data: reader.result,
+                    size: file.size,
+                    mimeType: file.type,
+                    timestamp: msg.timestamp
+                });
+                if (!sent) msg.sendFailed = true;
+                addMessage(peerId, msg);
+                appendMessageEl(msg);
+                scrollMessages();
+                renderContacts();
+            };
+            reader.readAsDataURL(file);
+        }
+
+        // ── render ──
+        function appendMessageEl(msg) {
+            const row = document.createElement('div');
+            row.className = 'msg-row ' + (msg.type === 'system' ? 'system' : (msg.self ? 'self' : 'peer'));
+
+            const bubble = document.createElement('div');
+            bubble.className = 'msg-bubble';
+
+            if (msg.type === 'text') {
+                bubble.textContent = msg.content;
+                if (msg.sendFailed) {
+                    bubble.style.opacity = '0.6';
+                    bubble.title = '发送失败（对方未连接）';
+                }
+            } else if (msg.type === 'image') {
+                const img = document.createElement('img');
+                img.className = 'msg-image';
+                img.src = msg.data;
+                img.onclick = () => {
+                    const win = window.open('');
+                    win.document.write(`<img src="${msg.data}" style="max-width:100%;">`);
+                };
+                bubble.appendChild(img);
+                if (msg.name) {
+                    const nameEl = document.createElement('div');
+                    nameEl.style.fontSize = '0.75rem';
+                    nameEl.style.color = '#64748b';
+                    nameEl.style.marginTop = '4px';
+                    nameEl.textContent = msg.name;
+                    bubble.appendChild(nameEl);
+                }
+            } else if (msg.type === 'file') {
+                bubble.style.cursor = 'pointer';
+                bubble.innerHTML = `
+                    <div class="msg-file">
+                        <span class="msg-file-icon">📄</span>
+                        <div class="msg-file-info">
+                            <div class="msg-file-name">${escapeHtml(msg.name)}</div>
+                            <div class="msg-file-size">${formatFileSize(msg.size || 0)}</div>
+                        </div>
+                    </div>`;
+                bubble.onclick = () => {
+                    const a = document.createElement('a');
+                    a.href = msg.data;
+                    a.download = msg.name;
+                    a.click();
+                };
+            }
+
+            row.appendChild(bubble);
+
+            const timeEl = document.createElement('div');
+            timeEl.className = 'msg-time';
+            timeEl.textContent = formatTime(msg.timestamp);
+            row.appendChild(timeEl);
+
+            els.messagesContainer.appendChild(row);
+        }
+
+        function escapeHtml(str) {
+            const el = document.createElement('span');
+            el.textContent = str;
+            return el.innerHTML;
+        }
+
+        function scrollMessages() {
+            const container = els.messagesContainer;
+            requestAnimationFrame(() => {
+                container.scrollTop = container.scrollHeight;
+            });
+        }
+
+        function renderMessages(peerId) {
+            els.messagesContainer.innerHTML = '';
+            const msgs = getMessages(peerId);
+            msgs.forEach((msg) => appendMessageEl(msg));
+            scrollMessages();
+        }
+
+        function renderContacts() {
+            const store = loadStore();
+            const list = els.contactList;
+
+            if (store.contacts.length === 0) {
+                list.innerHTML = '<div class="empty-contacts">暂无联系人，请添加对方的 Peer ID</div>';
+                return;
+            }
+
+            list.innerHTML = '';
+            store.contacts.forEach((peerId) => {
+                const msgs = store.messages[peerId] || [];
+                const lastMsg = msgs[msgs.length - 1];
+                const online = isPeerConnected(peerId);
+
+                const item = document.createElement('div');
+                item.className = 'contact-item' + (state.activePeer === peerId ? ' active' : '');
+                item.innerHTML = `
+                    <div class="contact-avatar">${peerId.slice(0, 2).toUpperCase()}</div>
+                    <div class="contact-info">
+                        <div class="contact-name">
+                            ${escapeHtml(peerId)}
+                            ${online ? '<span style="color:#22c55e;font-size:0.7rem;">●</span>' : ''}
+                        </div>
+                        <div class="contact-preview">${lastMsg ? previewText(lastMsg) : '暂无消息'}</div>
+                    </div>
+                    <div class="contact-actions">
+                        <button class="btn-del-contact" data-peer="${escapeHtml(peerId)}" title="删除">✕</button>
+                    </div>`;
+
+                item.addEventListener('click', (e) => {
+                    if (e.target.closest('.btn-del-contact')) return;
+                    openChat(peerId);
+                });
+
+                item.querySelector('.btn-del-contact').addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    deleteMessages(peerId);
+                    if (state.activePeer === peerId) {
+                        closeChat();
+                    }
+                    renderContacts();
+                    showToast('已删除对话');
+                });
+
+                list.appendChild(item);
+            });
+        }
+
+        function previewText(msg) {
+            if (msg.type === 'text') return msg.content.slice(0, 30);
+            if (msg.type === 'image') return '[图片]';
+            if (msg.type === 'file') return '[文件] ' + (msg.name || '');
+            return '';
+        }
+
+        function openChat(peerId) {
+            state.activePeer = peerId;
+            setLastActive(peerId);
+            els.chatEmpty.style.display = 'none';
+            els.chatPanel.style.display = 'flex';
+            els.chatPeerName.textContent = peerId;
+            els.chatPeerId.textContent = 'Peer ID: ' + peerId;
+            enableChatInput(isPeerConnected(peerId));
+            connectToPeer(peerId);
+            renderMessages(peerId);
+            renderContacts();
+
+            if (window.innerWidth <= 700) {
+                els.chatArea.classList.add('show-mobile');
+                $('sidebar').classList.add('hide-mobile');
+            }
+        }
+
+        function closeChat() {
+            state.activePeer = null;
+            els.chatEmpty.style.display = 'flex';
+            els.chatPanel.style.display = 'none';
+            els.messagesContainer.innerHTML = '';
+        }
+
+        function enableChatInput(enabled) {
+            els.msgInput.disabled = !enabled;
+            els.msgInput.placeholder = enabled ? '输入消息...' : '对方未连接，无法发送';
+            $('btnSend').disabled = !enabled;
+            $('btnSendImage').disabled = !enabled;
+            $('btnSendFile').disabled = !enabled;
+        }
+
+        // ── event bindings ──
+        function bindEvents() {
+            // Copy ID
+            $('btnCopyId').addEventListener('click', async () => {
+                try {
+                    await navigator.clipboard.writeText(state.myPeerId || '');
+                    showToast('Peer ID 已复制');
+                } catch (e) {
+                    showToast('复制失败');
+                }
+            });
+
+            // QR modal
+            $('btnShowQr').addEventListener('click', async () => {
+                els.qrPeerId.textContent = state.myPeerId || '未就绪';
+                els.qrModal.classList.add('active');
+                if (window.QRCode && state.myPeerId) {
+                    try {
+                        await window.QRCode.toCanvas(els.qrCanvas, state.myPeerId, {
+                            width: 220,
+                            margin: 1,
+                            color: { dark: '#0f172a', light: '#ffffff' }
+                        });
+                    } catch (e) {
+                        console.error('QR error:', e);
+                    }
+                }
+            });
+            $('btnCloseQr').addEventListener('click', () => {
+                els.qrModal.classList.remove('active');
+            });
+            els.qrModal.addEventListener('click', (e) => {
+                if (e.target === els.qrModal) els.qrModal.classList.remove('active');
+            });
+
+            // Add contact
+            $('btnAddContact').addEventListener('click', () => {
+                const peerId = els.addPeerInput.value.trim();
+                if (!peerId || peerId === state.myPeerId) {
+                    showToast('请输入有效的 Peer ID');
+                    return;
+                }
+                addContact(peerId);
+                connectToPeer(peerId);
+                els.addPeerInput.value = '';
+                renderContacts();
+                openChat(peerId);
+                showToast('已添加联系人: ' + peerId);
+            });
+            els.addPeerInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') $('btnAddContact').click();
+            });
+
+            // Send text
+            $('btnSend').addEventListener('click', () => {
+                const content = els.msgInput.value.trim();
+                if (!content || !state.activePeer) return;
+                sendTextMessage(state.activePeer, content);
+                els.msgInput.value = '';
+                els.msgInput.style.height = '';
+            });
+            els.msgInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    $('btnSend').click();
+                }
+            });
+            els.msgInput.addEventListener('input', () => {
+                els.msgInput.style.height = '';
+                els.msgInput.style.height = Math.min(els.msgInput.scrollHeight, 120) + 'px';
+            });
+
+            // Send image
+            $('btnSendImage').addEventListener('click', () => {
+                els.fileInput.click();
+            });
+            els.fileInput.addEventListener('change', () => {
+                const file = els.fileInput.files[0];
+                if (!file || !state.activePeer) return;
+                sendImageMessage(state.activePeer, file);
+                els.fileInput.value = '';
+            });
+
+            // Send file
+            $('btnSendFile').addEventListener('click', () => {
+                els.docInput.click();
+            });
+            els.docInput.addEventListener('change', () => {
+                const file = els.docInput.files[0];
+                if (!file || !state.activePeer) return;
+                sendFileMessage(state.activePeer, file);
+                els.docInput.value = '';
+            });
+
+            // Call buttons
+            $('btnCallVoice').addEventListener('click', () => {
+                if (!state.activePeer) return;
+                startCall(state.activePeer, false);
+            });
+            $('btnCallVideo').addEventListener('click', () => {
+                if (!state.activePeer) return;
+                startCall(state.activePeer, true);
+            });
+
+            // Delete chat
+            $('btnDeleteChat').addEventListener('click', () => {
+                if (!state.activePeer) return;
+                if (confirm('确定删除与 ' + state.activePeer + ' 的所有对话记录？')) {
+                    deleteMessages(state.activePeer);
+                    const pid = state.activePeer;
+                    closeChat();
+                    renderContacts();
+                    showToast('已删除与 ' + pid + ' 的对话');
+                }
+            });
+
+            // Clear all
+            $('btnClearAll').addEventListener('click', () => {
+                if (confirm('确定清空所有本地聊天记录和联系人？此操作不可恢复。')) {
+                    clearAllMessages();
+                    closeChat();
+                    renderContacts();
+                    showToast('已清空所有本地记录');
+                }
+            });
+
+            // Close call on overlay click (but not on buttons/video)
+            els.callOverlay.addEventListener('click', (e) => {
+                if (e.target === els.callOverlay) endCall();
+            });
+
+            // Mobile back button handling - add a back button in chat header on mobile
+            if (window.innerWidth <= 700) {
+                const backBtn = document.createElement('button');
+                backBtn.className = 'btn-sm';
+                backBtn.textContent = '← 返回';
+                backBtn.style.cssText = 'margin-right:8px;';
+                backBtn.addEventListener('click', () => {
+                    els.chatArea.classList.remove('show-mobile');
+                    $('sidebar').classList.remove('hide-mobile');
+                });
+                const chatHeader = els.chatPanel.querySelector('.chat-header');
+                chatHeader.insertBefore(backBtn, chatHeader.firstChild);
+            }
+
+            // Paste image
+            document.addEventListener('paste', (e) => {
+                if (!state.activePeer) return;
+                const items = e.clipboardData?.items;
+                if (!items) return;
+                for (const item of items) {
+                    if (item.type.startsWith('image/')) {
+                        const file = item.getAsFile();
+                        sendImageMessage(state.activePeer, file);
+                        break;
+                    }
+                }
+            });
+        }
+
+        // ── init ──
+        function init() {
+            bindEvents();
+            initPeer();
+            renderContacts();
+
+            // Restore last active chat
+            const store = loadStore();
+            if (store.lastActive && store.contacts.includes(store.lastActive)) {
+                openChat(store.lastActive);
+            }
+        }
+
+        init();
+    })();
+    </script>
+</body>
+</html>
