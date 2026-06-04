@@ -52,6 +52,11 @@
                 "title": "远控颜色",
                 "description": "本地调色与 PeerJS 远程主从控制，支持 RGB、色盘、亮度与全屏展示。",
                 "url": "html/远控颜色/index.html"
+            },
+            {
+                "title": "KiCad 网表分析工具",
+                "description": "用于分析 KiCad 网表的工具",
+                "url": "html/kicad网表分析/index.html"
             }
         ]
     },

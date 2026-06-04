@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KiCad 网表分析工具</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Arial, sans-serif; background: #f5f5f5; padding: 20px; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        h1 { color: #333; margin-bottom: 20px; text-align: center; }
+        .upload-area {
+            background: white;
+            border: 2px dashed #4CAF50;
+            border-radius: 10px;
+            padding: 40px;
+            text-align: center;
+            margin-bottom: 20px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .upload-area:hover { background: #f0fff0; border-color: #45a049; }
+        .upload-area.dragover { background: #e8f5e9; border-color: #2E7D32; }
+        input[type="file"] { display: none; }
+        .summary-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .card {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .card-title { font-size: 14px; color: #666; margin-bottom: 10px; }
+        .card-value { font-size: 36px; font-weight: bold; color: #2196F3; }
+        .card-icon { float: right; font-size: 40px; opacity: 0.3; }
+        .table-container {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        h2 { color: #333; margin-bottom: 15px; font-size: 18px; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; }
+        th { background: #f8f9fa; color: #555; font-weight: 600; }
+        tr:hover { background: #f5f5f5; }
+        .bar { height: 20px; background: #4CAF50; border-radius: 10px; min-width: 5px; }
+        .bar-container { width: 200px; background: #eee; border-radius: 10px; overflow: hidden; }
+        .chip { display: inline-block; padding: 4px 12px; border-radius: 16px; font-size: 12px; margin: 2px; }
+        .chip-blue { background: #e3f2fd; color: #1976D2; }
+        .chip-green { background: #e8f5e9; color: #388E3C; }
+        .chip-orange { background: #fff3e0; color: #F57C00; }
+        #result { display: none; }
+        .export-btn {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-top: 10px;
+        }
+        .export-btn:hover { background: #45a049; }
+        .debug-btn {
+            background: #FF9800;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-left: 10px;
+        }
+        .debug-btn:hover { background: #F57C00; }
+        #debugPanel {
+            display: none;
+            margin-top: 20px;
+            padding: 15px;
+            background: #f5f5f5;
+            border-radius: 8px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        #debugOutput { white-space: pre-wrap; font-size: 12px; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 KiCad 网表分析工具</h1>
+
+        <div class="upload-area" id="dropZone">
+            <p style="font-size: 48px; margin-bottom: 10px;">📁</p>
+            <p style="font-size: 18px; color: #666;">拖放 project.net 或 project.xml 文件到这里</p>
+            <p style="font-size: 14px; color: #999; margin-top: 10px;">或点击选择文件</p>
+            <input type="file" id="fileInput" accept=".xml,.net">
+        </div>
+
+        <div id="result">
+            <div class="summary-cards">
+                <div class="card">
+                    <div class="card-icon">📊</div>
+                    <div class="card-title">总原理图数</div>
+                    <div class="card-value" id="totalSheets">-</div>
+                </div>
+                <div class="card">
+                    <div class="card-icon">📦</div>
+                    <div class="card-title">总器件数</div>
+                    <div class="card-value" id="totalComponents">-</div>
+                </div>
+                <div class="card">
+                    <div class="card-icon">📌</div>
+                    <div class="card-title">总管脚数</div>
+                    <div class="card-value" id="totalPins">-</div>
+                </div>
+                <div class="card">
+                    <div class="card-icon">📈</div>
+                    <div class="card-title">平均每器件管脚</div>
+                    <div class="card-value" id="avgPins">-</div>
+                </div>
+            </div>
+
+            <div class="table-container">
+                <h2>📋 各原理图统计</h2>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>原理图名称</th>
+                            <th>器件数</th>
+                            <th>管脚数</th>
+                            <th>占比 (器件)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="sheetStats"></tbody>
+                </table>
+            </div>
+
+            <div class="table-container">
+                <h2>🔍 详细信息</h2>
+                <div id="sheetDetails"></div>
+            </div>
+
+            <button class="export-btn" onclick="exportCSV()">📥 导出 CSV</button>
+            <button class="debug-btn" onclick="toggleDebug()">🔍 调试信息</button>
+
+            <div id="debugPanel">
+                <h3>调试信息</h3>
+                <pre id="debugOutput"></pre>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+        const resultDiv = document.getElementById('result');
+        let debugInfo = [];
+
+        function logDebug(msg) {
+            debugInfo.push(msg);
+            document.getElementById('debugOutput').textContent = debugInfo.join('\n');
+        }
+
+        function toggleDebug() {
+            const panel = document.getElementById('debugPanel');
+            panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+        }
+
+        // Drag and drop handlers
+        dropZone.addEventListener('click', () => fileInput.click());
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        });
+        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            const file = e.dataTransfer.files[0];
+            if (file) processFile(file);
+        });
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files[0]) processFile(e.target.files[0]);
+        });
+
+        function processFile(file) {
+            debugInfo = [];
+            logDebug('处理文件: ' + file.name + ' (' + file.size + ' 字节)');
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const content = e.target.result;
+                if (file.name.endsWith('.xml')) {
+                    parseXML(content);
+                } else if (file.name.endsWith('.net')) {
+                    parseNET(content);
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        function parseXML(content) {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(content, 'text/xml');
+            analyzeData(doc);
+        }
+
+        function parseNET(content) {
+            logDebug('开始解析 .net 文件...');
+
+            // 统一换行符为 \n
+            content = content.replace(/\r\n/g, '\n');
+            logDebug('已统一换行符');
+
+            const sheets = [];
+            const components = [];
+
+            // 提取原理图定义
+            const sheetRegex = /\(sheet\s*\n?\s*\(number\s+"(\d+)"\)\s*\n?\s*\(name\s+"([^"]+)"\)\s*\n?\s*\(tstamps\s+"([^"]+)"\)/g;
+            let match;
+            while ((match = sheetRegex.exec(content)) !== null) {
+                const name = match[2].replace(/\//g, '') || '(根原理图)';
+                sheets.push({
+                    number: match[1],
+                    name: name,
+                    tstamps: match[3]
+                });
+                logDebug('找到原理图: ' + name);
+            }
+
+            // 找到 components 部分的开始和结束
+            const componentsStart = content.indexOf('(components');
+            if (componentsStart === -1) {
+                logDebug('未找到 components 部分');
+                return;
+            }
+            logDebug('components 部分起始位置: ' + componentsStart);
+
+            // 找到 components 部分的结束 - 需要匹配括号
+            let depth = 0;
+            let componentsEnd = -1;
+            for (let i = componentsStart; i < content.length; i++) {
+                if (content[i] === '(') {
+                    depth++;
+                } else if (content[i] === ')') {
+                    depth--;
+                    if (depth === 0) {
+                        componentsEnd = i + 1;
+                        break;
+                    }
+                }
+            }
+
+            if (componentsEnd === -1) {
+                logDebug('未找到 components 部分结束');
+                return;
+            }
+
+            const componentsSection = content.substring(componentsStart, componentsEnd);
+            logDebug('components 部分长度: ' + componentsSection.length + ' 字符');
+
+            // 用正则表达式提取所有组件
+            // 匹配 (comp 开始，到对应的 ) 结束
+            const compRegex = /\(comp\s*\n\s*\(ref\s+"([^"]+)"\)[\s\S]*?\(property\s*\n\s*\(name\s+"Sheetname"\)\s*\n\s*\(value\s+"([^"]*)"\)\)[\s\S]*?\(pin\s*\n\s*\(/g;
+
+            // 更简单的方法：用 split 分割
+            const compBlocks = componentsSection.split(/\n\t\t\(comp\n/);
+            logDebug('分割后得到 ' + compBlocks.length + ' 个块');
+
+            // 打印第一个块的内容以便调试
+            if (compBlocks.length > 1) {
+                logDebug('第一个块的前200字符:');
+                logDebug(compBlocks[1].substring(0, 200));
+            }
+
+            for (let i = 1; i < compBlocks.length; i++) {
+                const block = compBlocks[i];
+
+                // 提取 ref - 更宽松的匹配
+                const refMatch = block.match(/\(ref\s+"([^"]+)"\)/);
+                if (!refMatch) {
+                    logDebug('块 ' + i + ' 未找到 ref');
+                    continue;
+                }
+
+                const ref = refMatch[1];
+
+                // 提取 Sheetname - 更宽松的匹配
+                let sheetname = '';
+                const sheetnameMatch = block.match(/\(name\s+"Sheetname"\)\s*\n\s*\(value\s+"([^"]*)"\)/);
+                if (sheetnameMatch) {
+                    sheetname = sheetnameMatch[1];
+                }
+
+                // 计算管脚数 - 统计 (pin 的数量
+                const pinMatches = block.match(/\(pin\s*\n\s*\(/g);
+                const pinCount = pinMatches ? pinMatches.length : 0;
+
+                components.push({ ref, sheetname, pins: pinCount });
+
+                if (components.length <= 5 || components.length % 100 === 0) {
+                    logDebug('组件 #' + components.length + ': ' + ref + ', sheetname="' + sheetname + '", pins=' + pinCount);
+                }
+            }
+
+            logDebug('解析完成: ' + sheets.length + ' 个原理图, ' + components.length + ' 个组件');
+
+            // 构建数据结构
+            const sheetMap = {};
+            sheets.forEach(s => {
+                sheetMap[s.name] = {
+                    name: s.name,
+                    components: [],
+                    totalPins: 0
+                };
+            });
+
+            let totalComponents = 0;
+            let totalPins = 0;
+
+            components.forEach(comp => {
+                const sheetKey = comp.sheetname || '(根原理图)';
+                if (!sheetMap[sheetKey]) {
+                    sheetMap[sheetKey] = { name: sheetKey, components: [], totalPins: 0 };
+                }
+                sheetMap[sheetKey].components.push({ ref: comp.ref, pins: comp.pins });
+                sheetMap[sheetKey].totalPins += comp.pins;
+                totalComponents++;
+                totalPins += comp.pins;
+            });
+
+            // 删除空原理图
+            Object.keys(sheetMap).forEach(key => {
+                if (sheetMap[key].components.length === 0) {
+                    delete sheetMap[key];
+                }
+            });
+
+            const analysisData = {
+                sheets: sheetMap,
+                totalComponents: totalComponents,
+                totalPins: totalPins
+            };
+
+            displayResults(analysisData);
+        }
+
+        function analyzeData(doc) {
+            logDebug('开始解析 XML...');
+
+            const sheets = {};
+            const sheetElements = doc.querySelectorAll('design > sheet');
+
+            logDebug('找到 ' + sheetElements.length + ' 个原理图定义');
+
+            // Get sheet names from design section
+            sheetElements.forEach(sheet => {
+                const name = sheet.getAttribute('name');
+                if (name) {
+                    const cleanName = name.replace(/\//g, '') || '(根原理图)';
+                    sheets[cleanName] = {
+                        name: cleanName,
+                        components: [],
+                        totalPins: 0
+                    };
+                    logDebug('原理图: ' + cleanName);
+                }
+            });
+
+            // Analyze components
+            const components = doc.querySelectorAll('components > comp');
+            logDebug('找到 ' + components.length + ' 个组件');
+
+            let totalComponents = 0;
+            let totalPins = 0;
+
+            components.forEach((comp, idx) => {
+                const ref = comp.getAttribute('ref');
+                let sheetname = '';
+                const properties = comp.querySelectorAll(':scope > property');
+                properties.forEach(prop => {
+                    if (prop.getAttribute('name') === 'Sheetname') {
+                        sheetname = prop.getAttribute('value') || '';
+                    }
+                });
+
+                const pins = comp.querySelectorAll('pin');
+                const pinCount = pins.length;
+
+                if (idx < 3) {
+                    logDebug('组件 ' + ref + ': sheetname="' + sheetname + '", pins=' + pinCount);
+                }
+
+                let sheetKey = sheetname || '(根原理图)';
+                if (!sheets[sheetKey]) {
+                    sheets[sheetKey] = { name: sheetKey, components: [], totalPins: 0 };
+                }
+
+                sheets[sheetKey].components.push({ ref, pins: pinCount });
+                sheets[sheetKey].totalPins += pinCount;
+
+                totalComponents++;
+                totalPins += pinCount;
+            });
+
+            // Remove empty sheets
+            Object.keys(sheets).forEach(key => {
+                if (sheets[key].components.length === 0) {
+                    delete sheets[key];
+                }
+            });
+
+            logDebug('解析完成: ' + Object.keys(sheets).length + ' 个原理图, ' + totalComponents + ' 个组件, ' + totalPins + ' 个管脚');
+
+            const analysisData = { sheets, totalComponents, totalPins };
+            displayResults(analysisData);
+        }
+
+        function displayResults(data) {
+            const { sheets, totalComponents, totalPins } = data;
+            const sheetCount = Object.keys(sheets).length;
+
+            logDebug('显示结果: ' + sheetCount + ' 个原理图, ' + totalComponents + ' 个组件');
+
+            // Update summary cards
+            document.getElementById('totalSheets').textContent = sheetCount;
+            document.getElementById('totalComponents').textContent = totalComponents;
+            document.getElementById('totalPins').textContent = totalPins;
+            document.getElementById('avgPins').textContent = totalComponents > 0 ? (totalPins / totalComponents).toFixed(1) : '0';
+
+            // Update table
+            const tbody = document.getElementById('sheetStats');
+            tbody.innerHTML = '';
+
+            const sortedSheets = Object.values(sheets).sort((a, b) => b.components.length - a.components.length);
+            const maxComponents = sortedSheets.length > 0 ? Math.max(...sortedSheets.map(s => s.components.length)) : 1;
+
+            sortedSheets.forEach(sheet => {
+                const percentage = totalComponents > 0 ? ((sheet.components.length / totalComponents) * 100).toFixed(1) : '0';
+                const barWidth = ((sheet.components.length / maxComponents) * 100).toFixed(0);
+
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><strong>${sheet.name}</strong></td>
+                    <td>${sheet.components.length}</td>
+                    <td>${sheet.totalPins}</td>
+                    <td>
+                        <div class="bar-container">
+                            <div class="bar" style="width: ${barWidth}%"></div>
+                        </div>
+                        <small>${percentage}%</small>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            // Update details
+            const detailsDiv = document.getElementById('sheetDetails');
+            detailsDiv.innerHTML = '';
+
+            sortedSheets.forEach(sheet => {
+                const div = document.createElement('div');
+                div.style.marginBottom = '15px';
+
+                const header = document.createElement('div');
+                header.style.cursor = 'pointer';
+                header.style.padding = '10px';
+                header.style.background = '#f8f9fa';
+                header.style.borderRadius = '5px';
+                header.innerHTML = `<strong>▶ ${sheet.name}</strong> (${sheet.components.length} 器件, ${sheet.totalPins} 管脚)`;
+                header.onclick = function() {
+                    const content = this.nextElementSibling;
+                    content.style.display = content.style.display === 'none' ? 'block' : 'none';
+                    this.innerHTML = (content.style.display === 'none' ? '▶' : '▼') + ` ${sheet.name} (${sheet.components.length} 器件, ${sheet.totalPins} 管脚)`;
+                };
+
+                const content = document.createElement('div');
+                content.style.display = 'none';
+                content.style.padding = '10px';
+
+                // Group by component type
+                const refTypes = {};
+                sheet.components.forEach(comp => {
+                    const prefix = comp.ref.replace(/[0-9]+$/, '');
+                    if (!refTypes[prefix]) refTypes[prefix] = [];
+                    refTypes[prefix].push(comp.ref);
+                });
+
+                let chipsHTML = '';
+                Object.entries(refTypes).sort((a, b) => b[1].length - a[1].length).forEach(([prefix, refs]) => {
+                    const chipClass = prefix.startsWith('U') ? 'chip-blue' :
+                                     prefix.startsWith('R') ? 'chip-green' :
+                                     prefix.startsWith('C') ? 'chip-orange' : 'chip-blue';
+                    chipsHTML += `<span class="chip ${chipClass}">${prefix}: ${refs.length}个</span>`;
+                });
+
+                content.innerHTML = `
+                    <p><strong>器件类型:</strong></p>
+                    <div style="margin: 10px 0;">${chipsHTML}</div>
+                    <p><strong>具体器件:</strong> ${sheet.components.map(c => c.ref).join(', ')}</p>
+                `;
+
+                div.appendChild(header);
+                div.appendChild(content);
+                detailsDiv.appendChild(div);
+            });
+
+            resultDiv.style.display = 'block';
+        }
+
+        function exportCSV() {
+            if (!analysisData) return;
+
+            const { sheets, totalComponents, totalPins } = analysisData;
+            let csv = '原理图名称,器件数,管脚数,占比(%)\n';
+            csv += `总计,${totalComponents},${totalPins},100\n`;
+
+            Object.values(sheets).sort((a, b) => b.components.length - a.components.length).forEach(sheet => {
+                const percentage = ((sheet.components.length / totalComponents) * 100).toFixed(1);
+                csv += `${sheet.name},${sheet.components.length},${sheet.totalPins},${percentage}\n`;
+            });
+
+            csv += '\n原理图,器件编号,管脚数\n';
+            Object.values(sheets).forEach(sheet => {
+                sheet.components.forEach(comp => {
+                    csv += `${sheet.name},${comp.ref},${comp.pins}\n`;
+                });
+            });
+
+            const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = '网表分析结果.csv';
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+    </script>
+</body>
+</html>
